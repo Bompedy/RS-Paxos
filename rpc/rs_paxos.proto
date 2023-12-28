@@ -2,14 +2,20 @@ syntax = "proto3";
 
 option go_package = "./rpc";
 
-service ExampleService {
-  rpc GetMessage (MessageRequest) returns (MessageResponse);
+service Node {
+  rpc Write(WriteRequest) returns (WriteResponse) {}
+  rpc Commit(CommitRequest) returns (CommitResponse) {}
 }
 
-message MessageRequest {
-  string name = 1;
+message WriteRequest {
+  bytes key = 1;
+  bytes value = 2;
 }
 
-message MessageResponse {
-  string greeting = 1;
+message CommitRequest {
+  uint64 slot = 1;
+  uint32 command = 2;
 }
+
+message CommitResponse {}
+message WriteResponse {}
