@@ -146,7 +146,9 @@ func (node *Node) Write(etcd *etcdserver.EtcdServer, key []byte, value []byte) e
 		buffer[0] = OpWrite
 		binary.LittleEndian.PutUint32(buffer[1:5], uint32(len(key)))
 		binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(shard)))
-		copy(buffer[9:9+len(shard)], shard)
+		keyIndex := 9 + len(key)
+		copy(buffer[9:keyIndex], key)
+		copy(buffer[keyIndex:keyIndex+len(shard)], shard)
 		err := client.Write(buffer)
 		if err != nil {
 			panic(err)
