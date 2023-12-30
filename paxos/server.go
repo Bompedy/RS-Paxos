@@ -143,6 +143,23 @@ func (node *Node) Write(key []byte, value []byte) error {
 		panic(err)
 	}
 
+	node.quorum(func(index int, client Client) error {
+		// Add 1 since DS1 is the leaders segment
+		shard := segments[index+1]
+		buffer := make([]byte, 9+len(key)+len(shard))
+		buffer[0] = OpWrite
+		binary.LittleEndian.PutUint32(buffer[1:5], uint32(len(key)))
+		binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(shard)))
+		keyIndex := 9 + len(key)
+		copy(buffer[9:keyIndex], key)
+		copy(buffer[keyIndex:keyIndex+len(shard)], shard)
+		err := client.Write(buffer)
+		if err != nil {
+			panic(err)
+		}
+		return client.Read(make([]byte, 1))
+	})
+
 	return node.quorum(func(index int, client Client) error {
 		// Add 1 since DS1 is the leaders segment
 		shard := segments[index+1]
@@ -157,7 +174,7 @@ func (node *Node) Write(key []byte, value []byte) error {
 		if err != nil {
 			panic(err)
 		}
-		return client.Read(buffer[:1])
+		return client.Read(make([]byte, 1))
 	})
 }
 
