@@ -16,7 +16,7 @@ var OpWrite = uint8(0)
 var OpCommit = uint8(1)
 
 type Node struct {
-	Clients []*Client
+	Clients []Client
 	Storage Storage
 	Lock    sync.Mutex
 	Total   int
@@ -42,7 +42,7 @@ func (node *Node) Connect(nodes []string) error {
 			if err != nil {
 				panic(fmt.Sprintf("Can't parse address to index: %s", address))
 			}
-			node.Clients = append(node.Clients, &Client{
+			node.Clients = append(node.Clients, Client{
 				connection: client,
 				index:      uint8(index),
 				//buffer: make([]byte, 65535),
@@ -75,35 +75,35 @@ func (node *Node) Accept(
 		connection := Client{
 			connection: client,
 			index:      0,
-		}
+		}.connection
 
 		buffer := make([]byte, 65535)
 		go func() {
-			err := connection.Read(buffer[:1])
+			err := Read(connection, buffer[:1])
 			if err != nil {
 				panic(err)
 			}
 
 			op := buffer[0]
 			if op == OpWrite {
-				err := connection.Read(buffer[:8])
+				err := Read(connection, buffer[:8])
 				if err != nil {
 					panic(err)
 				}
 				keySize := binary.LittleEndian.Uint32(buffer[:4])
 				valueSize := binary.LittleEndian.Uint32(buffer[4:8])
-				err = connection.Read(buffer[:(keySize + valueSize)])
+				err = Read(connection, buffer[:(keySize+valueSize)])
 				if err != nil {
 					panic(err)
 				}
 
 				block(buffer[:keySize], buffer[keySize:(keySize+valueSize)])
-				err = connection.Write(buffer[:1])
+				err = Write(connection, buffer[:1])
 				if err != nil {
 					panic(err)
 				}
 			} else if op == OpCommit {
-				err = connection.Write(buffer[:1])
+				err = Write(connection, buffer[:1])
 				if err != nil {
 					panic(err)
 				}
@@ -141,6 +141,7 @@ func (node *Node) Write(key []byte, value []byte) error {
 
 	fmt.Printf("RS_PAXOS: FINISHED ENCODING - %d", len(segments))
 	client := node.Clients[0]
+	fmt.Printf("Client: %+v\n", client)
 	index := 0
 	fmt.Printf("RS_PAXOS: START BUFFERING FOR: %d\n", index)
 	shard := segments[index+1]
@@ -156,12 +157,12 @@ func (node *Node) Write(key []byte, value []byte) error {
 	fmt.Printf("COPY IN KEY: %d\n", index)
 	copy(buffer[keyIndex:keyIndex+len(shard)], shard)
 	fmt.Printf("RS_PAXOS: FINISHED BUFFERING FOR: %d\n", index)
-	err = client.Write(buffer)
+	err = Write(client.connection, buffer)
 	//fmt.Printf("RS_PAXOS: FINISHED WRITING FOR: %d\n", index)
 	//if err != nil {
 	//	panic(err)
 	//}
-	return client.Read(buffer[:1])
+	return Read(client.connection, buffer[:1])
 	//
 	//return node.quorum(func(index int, client Client) error {
 	//	// Add 1 since DS1 is the leaders segment
@@ -170,7 +171,7 @@ func (node *Node) Write(key []byte, value []byte) error {
 }
 
 func (node *Node) quorum(
-	block func(index int, client *Client) error,
+	block func(index int, client Client) error,
 ) error {
 	var waiter sync.WaitGroup
 	waiter.Add(node.Total - 1)
@@ -178,7 +179,7 @@ func (node *Node) quorum(
 
 	for i := range node.Clients {
 		client := node.Clients[i]
-		go func(index int, client *Client) {
+		go func(index int, client Client) {
 			err := block(index, client)
 			if err != nil {
 				panic(err)
