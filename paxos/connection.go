@@ -2,9 +2,9 @@ package paxos
 
 import "net"
 
-func Read(conn net.Conn, buffer []byte) error {
+func (client Client) Read(buffer []byte) error {
 	for start := 0; start != len(buffer); {
-		amount, reason := conn.Read(buffer[start:])
+		amount, reason := client.connection.Read(buffer[start:])
 		if reason != nil {
 			return reason
 		}
@@ -12,9 +12,9 @@ func Read(conn net.Conn, buffer []byte) error {
 	}
 	return nil
 }
-func Write(conn net.Conn, buffer []byte) error {
+func (client Client) Write(buffer []byte) error {
 	for start := 0; start != len(buffer); {
-		amount, reason := conn.Write(buffer[start:])
+		amount, reason := client.connection.Write(buffer[start:])
 		if reason != nil {
 			return reason
 		}

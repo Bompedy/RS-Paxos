@@ -35,7 +35,7 @@ func (node *Node) Connect(nodes []string) error {
 			defer waiter.Done()
 			var client net.Conn
 			var err error
-			for err != nil {
+			for client != nil && err == nil {
 				client, err = net.Dial("tcp", address)
 			}
 			index, err := strconv.Atoi(string(address[len(address)-3]))
@@ -75,35 +75,35 @@ func (node *Node) Accept(
 		connection := Client{
 			connection: client,
 			index:      0,
-		}.connection
+		}
 
 		buffer := make([]byte, 65535)
 		go func() {
-			err := Read(connection, buffer[:1])
+			err := connection.Read(buffer[:1])
 			if err != nil {
 				panic(err)
 			}
 
 			op := buffer[0]
 			if op == OpWrite {
-				err := Read(connection, buffer[:8])
+				err := connection.Read(buffer[:8])
 				if err != nil {
 					panic(err)
 				}
 				keySize := binary.LittleEndian.Uint32(buffer[:4])
 				valueSize := binary.LittleEndian.Uint32(buffer[4:8])
-				err = Read(connection, buffer[:(keySize+valueSize)])
+				err = connection.Read(buffer[:(keySize + valueSize)])
 				if err != nil {
 					panic(err)
 				}
 
 				block(buffer[:keySize], buffer[keySize:(keySize+valueSize)])
-				err = Write(connection, buffer[:1])
+				err = connection.Write(buffer[:1])
 				if err != nil {
 					panic(err)
 				}
 			} else if op == OpCommit {
-				err = Write(connection, buffer[:1])
+				err = connection.Write(buffer[:1])
 				if err != nil {
 					panic(err)
 				}
@@ -140,34 +140,29 @@ func (node *Node) Write(key []byte, value []byte) error {
 	}
 
 	fmt.Printf("RS_PAXOS: FINISHED ENCODING - %d", len(segments))
-	client := node.Clients[0]
-	fmt.Printf("Client: %+v\n", client)
-	index := 0
-	fmt.Printf("RS_PAXOS: START BUFFERING FOR: %d\n", index)
-	shard := segments[index+1]
-	fmt.Printf("CREATE BUFFER FOR: %d\n", index)
-	buffer := make([]byte, 9+len(key)+len(shard))
-	buffer[0] = OpWrite
-	fmt.Printf("INSERT OP: %d\n", index)
-	binary.LittleEndian.PutUint32(buffer[1:5], uint32(len(key)))
-	binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(shard)))
-	fmt.Printf("INSERT key and shard length: %d\n", index)
-	keyIndex := 9 + len(key)
-	copy(buffer[9:keyIndex], key)
-	fmt.Printf("COPY IN KEY: %d\n", index)
-	copy(buffer[keyIndex:keyIndex+len(shard)], shard)
-	fmt.Printf("RS_PAXOS: FINISHED BUFFERING FOR: %d\n", index)
-	err = Write(client.connection, buffer)
-	//fmt.Printf("RS_PAXOS: FINISHED WRITING FOR: %d\n", index)
-	//if err != nil {
-	//	panic(err)
-	//}
-	return Read(client.connection, buffer[:1])
-	//
-	//return node.quorum(func(index int, client Client) error {
-	//	// Add 1 since DS1 is the leaders segment
-	//
-	//})
+	return node.quorum(func(index int, client Client) error {
+		// Add 1 since DS1 is the leaders segment
+		fmt.Printf("RS_PAXOS: START BUFFERING FOR: %d\n", index)
+		shard := segments[index+1]
+		fmt.Printf("CREATE BUFFER FOR: %d\n", index)
+		buffer := make([]byte, 9+len(key)+len(shard))
+		buffer[0] = OpWrite
+		fmt.Printf("INSERT OP: %d\n", index)
+		binary.LittleEndian.PutUint32(buffer[1:5], uint32(len(key)))
+		binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(shard)))
+		fmt.Printf("INSERT key and shard length: %d\n", index)
+		keyIndex := 9 + len(key)
+		copy(buffer[9:keyIndex], key)
+		fmt.Printf("COPY IN KEY: %d\n", index)
+		copy(buffer[keyIndex:keyIndex+len(shard)], shard)
+		fmt.Printf("RS_PAXOS: FINISHED BUFFERING FOR: %d\n", index)
+		err := client.Write(buffer)
+		fmt.Printf("RS_PAXOS: FINISHED WRITING FOR: %d\n", index)
+		if err != nil {
+			panic(err)
+		}
+		return client.Read(buffer[:1])
+	})
 }
 
 func (node *Node) quorum(
