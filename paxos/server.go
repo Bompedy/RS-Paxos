@@ -20,12 +20,11 @@ var OpWrite = uint8(0)
 var OpCommit = uint8(1)
 
 type Node struct {
-	Clients  []Client
-	Storage  Storage
-	Lock     sync.Mutex
-	Majority int
-	Total    int
-	Encoder  reedsolomon.Encoder
+	Clients []Client
+	Storage Storage
+	Lock    sync.Mutex
+	Total   int
+	Encoder reedsolomon.Encoder
 }
 
 func (node *Node) Connect(nodes []string) error {
@@ -116,31 +115,39 @@ func (node *Node) Accept(etcd *etcdserver.EtcdServer, address string) error {
 }
 
 func (node *Node) Write(etcd *etcdserver.EtcdServer, key []byte, value []byte) error {
-	const numSegments = 2
-	const parity = 2
 	trace := traceutil.Get(context.Background())
 	var write = etcd.KV().Write(trace)
 	write.Put(key, value, 0)
 	write.End()
 
-	var segmentSize = int(math.Ceil(float64(len(value)) / float64(numSegments-parity)))
-	var segments = reedsolomon.AllocAligned(numSegments, segmentSize)
-	var length = make([]byte, 4)
-	binary.LittleEndian.PutUint32(length, uint32(len(value)))
-	var data = append(length, value...)
+	const numSegments = 3
+	const parity = 2
+	var segmentSize = int(math.Ceil(float64(len(value)) / float64(numSegments)))
+	var segments = reedsolomon.AllocAligned(numSegments+parity, segmentSize)
 	var startIndex = 0
-	for i := range segments[:node.Total-1-parity] {
+	for i := range segments[:numSegments] {
 		endIndex := startIndex + segmentSize
 		if endIndex > len(value) {
 			endIndex = len(value)
 		}
-		copy(segments[i], data[startIndex:endIndex])
+		copy(segments[i], value[startIndex:endIndex])
 		startIndex = endIndex
 	}
 
-	err := node.quorum(func(index int, client Client) error {
-		shard := segments[index]
-		buffer := make([]byte, 9)
+	err := node.Encoder.Encode(segments)
+	if err != nil {
+		panic(err)
+	}
+
+	ok, err := node.Encoder.Verify(segments)
+	if err != nil || !ok {
+		panic(err)
+	}
+
+	return node.quorum(func(index int, client Client) error {
+		// Add 1 since DS1 is the leaders segment
+		shard := segments[index+1]
+		buffer := make([]byte, 9+len(key)+len(shard))
 		buffer[0] = OpWrite
 		binary.LittleEndian.PutUint32(buffer[1:5], uint32(len(key)))
 		binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(shard)))
@@ -153,32 +160,13 @@ func (node *Node) Write(etcd *etcdserver.EtcdServer, key []byte, value []byte) e
 		}
 		return client.Read(buffer[:1])
 	})
-
-	if err != nil {
-		panic(err)
-	}
-
-	err = node.quorum(func(index int, client Client) error {
-		buffer := make([]byte, 1)
-		err := client.Write(buffer)
-		if err != nil {
-			panic(err)
-		}
-		return client.Read(buffer[:1])
-	})
-
-	if err != nil {
-		panic(err)
-	}
-
-	return nil
 }
 
 func (node *Node) quorum(
 	block func(index int, client Client) error,
 ) error {
 	var waiter sync.WaitGroup
-	waiter.Add(node.Majority)
+	waiter.Add(node.Total - 1)
 	var count = uint32(0)
 
 	for i := range node.Clients {
@@ -187,7 +175,7 @@ func (node *Node) quorum(
 			if err != nil {
 				panic(err)
 			}
-			if atomic.AddUint32(&count, 1) <= uint32(node.Majority) {
+			if atomic.AddUint32(&count, 1) <= uint32(node.Total-1) {
 				waiter.Done()
 			}
 		}(i, node.Clients[i])
