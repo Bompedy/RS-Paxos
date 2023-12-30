@@ -113,8 +113,8 @@ func (node *Node) Accept(
 }
 
 func (node *Node) Write(key []byte, value []byte) error {
-	fmt.Printf("Writing key: %s, Length: %d", string(key), len(key))
-	fmt.Printf("Writing value: %s, Length: %d", string(value), len(value))
+	fmt.Printf("Writing key: %s, Length: %d\n", string(key), len(key))
+	fmt.Printf("Writing value: %s, Length: %d\n", string(value), len(value))
 	const numSegments = 3
 	const parity = 2
 	var segmentSize = int(math.Ceil(float64(len(value)) / float64(numSegments)))
@@ -139,30 +139,34 @@ func (node *Node) Write(key []byte, value []byte) error {
 		panic(err)
 	}
 
-	println("RS_PAXOS: FINISHED ENCODING")
-	return node.quorum(func(index int, client Client) error {
-		// Add 1 since DS1 is the leaders segment
-		fmt.Printf("RS_PAXOS: START BUFFERING FOR: %d\n", index)
-		shard := segments[index+1]
-		fmt.Printf("CREATE BUFFER FOR: %d\n", index)
-		buffer := make([]byte, 9+len(key)+len(shard))
-		buffer[0] = OpWrite
-		fmt.Printf("INSERT OP: %d\n", index)
-		binary.LittleEndian.PutUint32(buffer[1:5], uint32(len(key)))
-		binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(shard)))
-		fmt.Printf("INSERT key and shard length: %d\n", index)
-		keyIndex := 9 + len(key)
-		copy(buffer[9:keyIndex], key)
-		fmt.Printf("COPY IN KEY: %d\n", index)
-		copy(buffer[keyIndex:keyIndex+len(shard)], shard)
-		fmt.Printf("RS_PAXOS: FINISHED BUFFERING FOR: %d\n", index)
-		err := client.Write(buffer)
-		fmt.Printf("RS_PAXOS: FINISHED WRITING FOR: %d\n", index)
-		if err != nil {
-			panic(err)
-		}
-		return client.Read(buffer[:1])
-	})
+	fmt.Printf("RS_PAXOS: FINISHED ENCODING - %d", len(segments))
+	client := node.Clients[0]
+	index := 0
+	fmt.Printf("RS_PAXOS: START BUFFERING FOR: %d\n", index)
+	shard := segments[index+1]
+	fmt.Printf("CREATE BUFFER FOR: %d\n", index)
+	buffer := make([]byte, 9+len(key)+len(shard))
+	buffer[0] = OpWrite
+	fmt.Printf("INSERT OP: %d\n", index)
+	binary.LittleEndian.PutUint32(buffer[1:5], uint32(len(key)))
+	binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(shard)))
+	fmt.Printf("INSERT key and shard length: %d\n", index)
+	keyIndex := 9 + len(key)
+	copy(buffer[9:keyIndex], key)
+	fmt.Printf("COPY IN KEY: %d\n", index)
+	copy(buffer[keyIndex:keyIndex+len(shard)], shard)
+	fmt.Printf("RS_PAXOS: FINISHED BUFFERING FOR: %d\n", index)
+	err = client.Write(buffer)
+	fmt.Printf("RS_PAXOS: FINISHED WRITING FOR: %d\n", index)
+	if err != nil {
+		panic(err)
+	}
+	return client.Read(buffer[:1])
+	//
+	//return node.quorum(func(index int, client Client) error {
+	//	// Add 1 since DS1 is the leaders segment
+	//
+	//})
 }
 
 func (node *Node) quorum(
