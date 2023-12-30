@@ -1,13 +1,9 @@
 package paxos
 
 import (
-	"context"
 	"encoding/binary"
 	"fmt"
 	"github.com/klauspost/reedsolomon"
-	"go.etcd.io/etcd/pkg/v3/traceutil"
-	"go.etcd.io/etcd/server/v3/etcdserver"
-	"go.etcd.io/etcd/server/v3/storage/mvcc"
 	"math"
 	"net"
 	"sort"
@@ -60,7 +56,10 @@ func (node *Node) Connect(nodes []string) error {
 	return nil
 }
 
-func (node *Node) Accept(etcd *etcdserver.EtcdServer, address string) error {
+func (node *Node) Accept(
+	address string,
+	block func(key []byte, value []byte),
+) error {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		panic(err)
@@ -96,10 +95,8 @@ func (node *Node) Accept(etcd *etcdserver.EtcdServer, address string) error {
 				if err != nil {
 					panic(err)
 				}
-				trace := traceutil.Get(context.Background())
-				var write = etcd.KV().Write(trace)
-				write.Put(buffer[:keySize], buffer[keySize:(keySize+valueSize)], 0)
-				write.End()
+
+				block(buffer[:keySize], buffer[keySize:(keySize+valueSize)])
 				err = connection.Write(buffer[:1])
 				if err != nil {
 					panic(err)
@@ -114,12 +111,7 @@ func (node *Node) Accept(etcd *etcdserver.EtcdServer, address string) error {
 	}
 }
 
-func (node *Node) Write(etcd *etcdserver.EtcdServer, key []byte, value []byte) error {
-	trace := traceutil.Get(context.Background())
-	var write = etcd.KV().Write(trace)
-	write.Put(key, value, 0)
-	write.End()
-
+func (node *Node) Write(key []byte, value []byte) error {
 	const numSegments = 3
 	const parity = 2
 	var segmentSize = int(math.Ceil(float64(len(value)) / float64(numSegments)))
@@ -183,16 +175,4 @@ func (node *Node) quorum(
 
 	waiter.Wait()
 	return nil
-}
-
-func (node *Node) Read(etcd *etcdserver.EtcdServer, key []byte) ([]byte, error) {
-	var options = mvcc.RangeOptions{}
-	trace := traceutil.Get(context.Background())
-	var read = etcd.KV().Read(mvcc.ConcurrentReadTxMode, trace)
-	defer read.End()
-	result, err := read.Range(context.Background(), key, nil, options)
-	if err != nil {
-		panic(err)
-	}
-	return result.KVs[0].Value, nil
 }
