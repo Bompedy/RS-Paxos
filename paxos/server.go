@@ -137,6 +137,7 @@ func (node *Node) Write(key []byte, value []byte) error {
 		panic(err)
 	}
 
+	println("RS_PAXOS: FINISHED ENCODING")
 	return node.quorum(func(index int, client Client) error {
 		// Add 1 since DS1 is the leaders segment
 		shard := segments[index+1]
@@ -147,7 +148,9 @@ func (node *Node) Write(key []byte, value []byte) error {
 		keyIndex := 9 + len(key)
 		copy(buffer[9:keyIndex], key)
 		copy(buffer[keyIndex:keyIndex+len(shard)], shard)
+		fmt.Printf("RS_PAXOS: FINISHED BUFFERING FOR: %d\n", index)
 		err := client.Write(buffer)
+		fmt.Printf("RS_PAXOS: FINISHED WRITING FOR: %d\n", index)
 		if err != nil {
 			panic(err)
 		}
@@ -163,6 +166,9 @@ func (node *Node) quorum(
 	var count = uint32(0)
 
 	for i := range node.Clients {
+		fmt.Printf("RS_PAXOS: QUOROM GRABBING CLIENT: %d\n", i)
+		client := node.Clients[i]
+		fmt.Printf("RS_PAXOS: FOUND CLIENT CLIENT: %d\n", i)
 		go func(index int, client Client) {
 			err := block(index, client)
 			if err != nil {
@@ -171,7 +177,7 @@ func (node *Node) quorum(
 			if atomic.AddUint32(&count, 1) <= uint32(node.Total-1) {
 				waiter.Done()
 			}
-		}(i, node.Clients[i])
+		}(i, client)
 	}
 
 	waiter.Wait()
