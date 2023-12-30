@@ -33,9 +33,10 @@ func (node *Node) Connect(nodes []string) error {
 		address := address
 		go func() {
 			defer waiter.Done()
-			client, err := net.Dial("tcp", address)
-			if err != nil {
-				panic(fmt.Sprintf("Can't connect to address: %s", address))
+			var client net.Conn
+			var err error
+			for err != nil {
+				client, err = net.Dial("tcp", address)
 			}
 			index, err := strconv.Atoi(string(address[len(address)-3]))
 			if err != nil {
