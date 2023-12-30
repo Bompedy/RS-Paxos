@@ -84,6 +84,7 @@ func (node *Node) Accept(
 		buffer := make([]byte, 65535)
 		go func() {
 			err := connection.Read(buffer[:1])
+			println("Got first byte")
 			if err != nil {
 				panic(err)
 			}
@@ -91,18 +92,22 @@ func (node *Node) Accept(
 			op := buffer[0]
 			if op == OpWrite {
 				err := connection.Read(buffer[:8])
+				println("Got sizes")
 				if err != nil {
 					panic(err)
 				}
 				keySize := binary.LittleEndian.Uint32(buffer[:4])
 				valueSize := binary.LittleEndian.Uint32(buffer[4:8])
 				err = connection.Read(buffer[:(keySize + valueSize)])
+				println("Got data")
 				if err != nil {
 					panic(err)
 				}
 
 				block(buffer[:keySize], buffer[keySize:(keySize+valueSize)])
+				println("Wrote to disk")
 				err = connection.Write(buffer[:1])
+				println("Responded")
 				if err != nil {
 					panic(err)
 				}
@@ -162,7 +167,7 @@ func (node *Node) Write(key []byte, value []byte) error {
 		copy(buffer[keyIndex:keyIndex+len(shard)], shard)
 		//fmt.Printf("RS_PAXOS: FINISHED BUFFERING FOR: %d\n", index)
 		err := client.Write(buffer)
-		//fmt.Printf("RS_PAXOS: FINISHED WRITING FOR: %d\n", index)
+		fmt.Printf("RS_PAXOS: FINISHED WRITING FOR: %d\n", index)
 		if err != nil {
 			panic(err)
 		}
