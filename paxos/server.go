@@ -85,7 +85,6 @@ func (node *Node) Accept(
 			buffer := make([]byte, 65535)
 			for {
 				err := connection.Read(buffer[:1])
-				println("Got first byte")
 				if err != nil {
 					panic(err)
 				}
@@ -93,22 +92,18 @@ func (node *Node) Accept(
 				op := buffer[0]
 				if op == OpWrite {
 					err := connection.Read(buffer[:8])
-					println("Got sizes")
 					if err != nil {
 						panic(err)
 					}
 					keySize := binary.LittleEndian.Uint32(buffer[:4])
 					valueSize := binary.LittleEndian.Uint32(buffer[4:8])
 					err = connection.Read(buffer[:(keySize + valueSize)])
-					println("Got data")
 					if err != nil {
 						panic(err)
 					}
 
 					block(buffer[:keySize], buffer[keySize:(keySize+valueSize)])
-					println("Wrote to disk")
 					err = connection.Write(buffer[:1])
-					println("Responded")
 					if err != nil {
 						panic(err)
 					}
@@ -124,8 +119,6 @@ func (node *Node) Accept(
 }
 
 func (node *Node) Write(key []byte, value []byte) error {
-	fmt.Printf("Writing key: %s, Length: %d\n", string(key), len(key))
-	fmt.Printf("Writing value: %s, Length: %d\n", string(value), len(value))
 	const numSegments = 3
 	const parity = 2
 	var segmentSize = int(math.Ceil(float64(len(value)) / float64(numSegments)))
@@ -150,26 +143,17 @@ func (node *Node) Write(key []byte, value []byte) error {
 		panic(err)
 	}
 
-	//fmt.Printf("RS_PAXOS: FINISHED ENCODING - %d", len(segments))
 	return node.quorum(func(index int, client Client) error {
-
 		// Add 1 since DS1 is the leaders segment
-		fmt.Printf("RS_PAXOS: START BUFFERING FOR: %v\n", client)
 		shard := segments[index+1]
-		//fmt.Printf("CREATE BUFFER FOR: %d\n", index)
 		buffer := make([]byte, 9+len(key)+len(shard))
 		buffer[0] = OpWrite
-		//fmt.Printf("INSERT OP: %d\n", index)
 		binary.LittleEndian.PutUint32(buffer[1:5], uint32(len(key)))
 		binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(shard)))
-		//fmt.Printf("INSERT key and shard length: %d\n", index)
 		keyIndex := 9 + len(key)
 		copy(buffer[9:keyIndex], key)
-		//fmt.Printf("COPY IN KEY: %d\n", index)
 		copy(buffer[keyIndex:keyIndex+len(shard)], shard)
-		//fmt.Printf("RS_PAXOS: FINISHED BUFFERING FOR: %d\n", index)
 		err := client.Write(buffer)
-		fmt.Printf("RS_PAXOS: FINISHED WRITING FOR: %d\n", index)
 		if err != nil {
 			panic(err)
 		}
