@@ -1,6 +1,6 @@
 module github.com/Bompedy/RS-Paxos
 
-go 1.21.4
+go 1.21.3
 
 require (
 	github.com/klauspost/cpuid/v2 v2.1.1 // indirect
