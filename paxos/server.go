@@ -140,7 +140,7 @@ func (node *Node) Write(key []byte, value []byte) error {
 	}
 
 	fmt.Printf("RS_PAXOS: FINISHED ENCODING - %d", len(segments))
-	client := node.Clients[0]
+	//client := node.Clients[0]
 	index := 0
 	fmt.Printf("RS_PAXOS: START BUFFERING FOR: %d\n", index)
 	shard := segments[index+1]
@@ -156,12 +156,13 @@ func (node *Node) Write(key []byte, value []byte) error {
 	fmt.Printf("COPY IN KEY: %d\n", index)
 	copy(buffer[keyIndex:keyIndex+len(shard)], shard)
 	fmt.Printf("RS_PAXOS: FINISHED BUFFERING FOR: %d\n", index)
-	err = client.Write(buffer)
-	fmt.Printf("RS_PAXOS: FINISHED WRITING FOR: %d\n", index)
-	if err != nil {
-		panic(err)
-	}
-	return client.Read(buffer[:1])
+	//err = client.Write(buffer)
+	//fmt.Printf("RS_PAXOS: FINISHED WRITING FOR: %d\n", index)
+	//if err != nil {
+	//	panic(err)
+	//}
+	return nil
+	//client.Read(buffer[:1])
 	//
 	//return node.quorum(func(index int, client Client) error {
 	//	// Add 1 since DS1 is the leaders segment
