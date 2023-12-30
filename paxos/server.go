@@ -28,32 +28,30 @@ type Node struct {
 	Encoder  reedsolomon.Encoder
 }
 
-func (node *Node) Connect(parent string, nodes []string) error {
+func (node *Node) Connect(nodes []string) error {
 	defer node.Lock.Unlock()
 	node.Lock.Lock()
 
 	var waiter sync.WaitGroup
 	for _, address := range nodes {
-		if address != parent {
-			waiter.Add(1)
-			address := address
-			go func() {
-				defer waiter.Done()
-				client, err := net.Dial("tcp", address)
-				if err != nil {
-					panic(fmt.Sprintf("Can't connect to address: %s", address))
-				}
-				index, err := strconv.Atoi(string(address[len(address)-3]))
-				if err != nil {
-					panic(fmt.Sprintf("Can't parse address to index: %s", address))
-				}
-				node.Clients = append(node.Clients, Client{
-					connection: client,
-					index:      uint8(index),
-					//buffer: make([]byte, 65535),
-				})
-			}()
-		}
+		waiter.Add(1)
+		address := address
+		go func() {
+			defer waiter.Done()
+			client, err := net.Dial("tcp", address)
+			if err != nil {
+				panic(fmt.Sprintf("Can't connect to address: %s", address))
+			}
+			index, err := strconv.Atoi(string(address[len(address)-3]))
+			if err != nil {
+				panic(fmt.Sprintf("Can't parse address to index: %s", address))
+			}
+			node.Clients = append(node.Clients, Client{
+				connection: client,
+				index:      uint8(index),
+				//buffer: make([]byte, 65535),
+			})
+		}()
 	}
 
 	waiter.Wait()
@@ -118,8 +116,8 @@ func (node *Node) Accept(etcd *etcdserver.EtcdServer, address string) error {
 }
 
 func (node *Node) Write(etcd *etcdserver.EtcdServer, key []byte, value []byte) error {
-	const numSegments = 3
-	const parity = 3
+	const numSegments = 2
+	const parity = 2
 	trace := traceutil.Get(context.Background())
 	var write = etcd.KV().Write(trace)
 	write.Put(key, value, 0)
