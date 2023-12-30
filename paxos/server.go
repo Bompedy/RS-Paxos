@@ -140,6 +140,7 @@ func (node *Node) Write(key []byte, value []byte) error {
 	println("RS_PAXOS: FINISHED ENCODING")
 	return node.quorum(func(index int, client Client) error {
 		// Add 1 since DS1 is the leaders segment
+		fmt.Printf("RS_PAXOS: START BUFFERING FOR: %d\n", index)
 		shard := segments[index+1]
 		buffer := make([]byte, 9+len(key)+len(shard))
 		buffer[0] = OpWrite
@@ -166,9 +167,7 @@ func (node *Node) quorum(
 	var count = uint32(0)
 
 	for i := range node.Clients {
-		fmt.Printf("RS_PAXOS: QUOROM GRABBING CLIENT: %d\n", i)
 		client := node.Clients[i]
-		fmt.Printf("RS_PAXOS: FOUND CLIENT CLIENT: %d\n", i)
 		go func(index int, client Client) {
 			err := block(index, client)
 			if err != nil {
