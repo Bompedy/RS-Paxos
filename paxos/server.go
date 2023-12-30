@@ -81,40 +81,42 @@ func (node *Node) Accept(
 			index:      0,
 		}
 
-		buffer := make([]byte, 65535)
 		go func() {
-			err := connection.Read(buffer[:1])
-			println("Got first byte")
-			if err != nil {
-				panic(err)
-			}
-
-			op := buffer[0]
-			if op == OpWrite {
-				err := connection.Read(buffer[:8])
-				println("Got sizes")
-				if err != nil {
-					panic(err)
-				}
-				keySize := binary.LittleEndian.Uint32(buffer[:4])
-				valueSize := binary.LittleEndian.Uint32(buffer[4:8])
-				err = connection.Read(buffer[:(keySize + valueSize)])
-				println("Got data")
+			buffer := make([]byte, 65535)
+			for {
+				err := connection.Read(buffer[:1])
+				println("Got first byte")
 				if err != nil {
 					panic(err)
 				}
 
-				block(buffer[:keySize], buffer[keySize:(keySize+valueSize)])
-				println("Wrote to disk")
-				err = connection.Write(buffer[:1])
-				println("Responded")
-				if err != nil {
-					panic(err)
-				}
-			} else if op == OpCommit {
-				err = connection.Write(buffer[:1])
-				if err != nil {
-					panic(err)
+				op := buffer[0]
+				if op == OpWrite {
+					err := connection.Read(buffer[:8])
+					println("Got sizes")
+					if err != nil {
+						panic(err)
+					}
+					keySize := binary.LittleEndian.Uint32(buffer[:4])
+					valueSize := binary.LittleEndian.Uint32(buffer[4:8])
+					err = connection.Read(buffer[:(keySize + valueSize)])
+					println("Got data")
+					if err != nil {
+						panic(err)
+					}
+
+					block(buffer[:keySize], buffer[keySize:(keySize+valueSize)])
+					println("Wrote to disk")
+					err = connection.Write(buffer[:1])
+					println("Responded")
+					if err != nil {
+						panic(err)
+					}
+				} else if op == OpCommit {
+					err = connection.Write(buffer[:1])
+					if err != nil {
+						panic(err)
+					}
 				}
 			}
 		}()
