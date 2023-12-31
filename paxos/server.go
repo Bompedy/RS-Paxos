@@ -19,11 +19,11 @@ type Node struct {
 	Clients []Client
 	Total   int
 	Encoder reedsolomon.Encoder
-	Log     *Log
+	Log     Log
 }
 
 type Log struct {
-	Lock    sync.Mutex
+	Lock    *sync.Mutex
 	Entries map[uint32]Entry
 }
 
@@ -73,10 +73,9 @@ func (node *Node) Connect(
 						panic(err)
 					}
 					commitIndex := binary.LittleEndian.Uint32(buffer)
-					log := node.Log
-					log.Lock.Lock()
-					entry, exists := log.Entries[commitIndex]
-					log.Lock.Unlock()
+					node.Log.Lock.Lock()
+					entry, exists := node.Log.Entries[commitIndex]
+					node.Log.Lock.Unlock()
 					acked := atomic.AddUint32(&entry.acked, 1)
 					fmt.Printf("Leader got response: %d, %d, %d, %v\n", commitIndex, acked, entry.majority, exists)
 					if exists && acked == entry.majority {
@@ -84,10 +83,10 @@ func (node *Node) Connect(
 						go func() {
 							block(entry.key, entry.value)
 
-							log.Lock.Lock()
-							delete(log.Entries, commitIndex)
+							node.Log.Lock.Lock()
+							delete(node.Log.Entries, commitIndex)
 							fmt.Printf("Removed log entry: %d\n", commitIndex)
-							log.Lock.Unlock()
+							node.Log.Lock.Unlock()
 						}()
 					}
 				}
