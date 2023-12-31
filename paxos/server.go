@@ -67,6 +67,7 @@ func (node *Node) Accept(
 	address string,
 	block func(key []byte, value []byte),
 ) error {
+	fmt.Printf("Accepting on: %s", address)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		panic(err)
