@@ -63,33 +63,33 @@ func (node *Node) Connect(
 				mutex:      &sync.Mutex{},
 			}
 			node.Clients = append(node.Clients, client)
-			//buffer := make([]byte, 4)
+			buffer := make([]byte, 4)
 
 			// this is the leader
 			go func() {
-				//for {
-				//	err = client.Read(buffer)
-				//	if err != nil {
-				//		panic(err)
-				//	}
-				//	commitIndex := binary.LittleEndian.Uint32(buffer)
-				//	node.Log.Lock.Lock()
-				//	entry, exists := node.Log.Entries[commitIndex]
-				//	node.Log.Lock.Unlock()
-				//	acked := atomic.AddUint32(&entry.acked, 1)
-				//	fmt.Printf("Leader got response: %d, %d, %d, %v\n", commitIndex, acked, entry.majority, exists)
-				//	if exists && acked == entry.majority {
-				//		println("Reach consensus?")
-				//		go func() {
-				//			block(entry.key, entry.value)
-				//
-				//			node.Log.Lock.Lock()
-				//			delete(node.Log.Entries, commitIndex)
-				//			fmt.Printf("Removed log entry: %d\n", commitIndex)
-				//			node.Log.Lock.Unlock()
-				//		}()
-				//	}
-				//}
+				for {
+					err = client.Read(buffer)
+					if err != nil {
+						panic(err)
+					}
+					commitIndex := binary.LittleEndian.Uint32(buffer)
+					node.Log.Lock.Lock()
+					entry, exists := node.Log.Entries[commitIndex]
+					node.Log.Lock.Unlock()
+					acked := atomic.AddUint32(&entry.acked, 1)
+					fmt.Printf("Leader got response: %d, %d, %d, %v\n", commitIndex, acked, entry.majority, exists)
+					if exists && acked == entry.majority {
+						println("Reach consensus?")
+						go func() {
+							block(entry.key, entry.value)
+
+							node.Log.Lock.Lock()
+							delete(node.Log.Entries, commitIndex)
+							fmt.Printf("Removed log entry: %d\n", commitIndex)
+							node.Log.Lock.Unlock()
+						}()
+					}
+				}
 			}()
 		}()
 	}
@@ -191,12 +191,12 @@ func (node *Node) Write(key []byte, value []byte) {
 		panic(err)
 	}
 	commitIndex := atomic.AddUint32(&CommitIndex, 1)
-	//node.Log.Entries[commitIndex] = Entry{
-	//	key:      key,
-	//	value:    value,
-	//	acked:    0,
-	//	majority: uint32(node.Total - 1),
-	//}
+	node.Log.Entries[commitIndex] = Entry{
+		key:      key,
+		value:    value,
+		acked:    0,
+		majority: uint32(node.Total - 1),
+	}
 
 	for i := range node.Clients {
 		go func(index int, client Client) {
