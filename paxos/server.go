@@ -71,6 +71,7 @@ func (node *Node) Connect(
 			go func() {
 				for {
 					err = client.Read(buffer)
+					println("Leader got response")
 					if err != nil {
 						panic(err)
 					}
@@ -87,6 +88,7 @@ func (node *Node) Connect(
 
 							log.LogLock.Lock()
 							delete(log.Entries, commitIndex)
+							fmt.Printf("Removed log entry: %d", commitIndex)
 							log.LogLock.Unlock()
 						}()
 					}
