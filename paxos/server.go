@@ -71,7 +71,6 @@ func (node *Node) Connect(
 			go func() {
 				for {
 					err = client.Read(buffer)
-					println("Leader got response")
 					if err != nil {
 						panic(err)
 					}
@@ -80,7 +79,10 @@ func (node *Node) Connect(
 					log.LogLock.Lock()
 					entry, exists := log.Entries[commitIndex]
 					log.LogLock.Unlock()
-					if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
+					acked := atomic.AddUint32(&entry.acked, 1)
+					fmt.Printf("Leader got response: %d, %d, %v", acked, entry.majority, exists)
+					if exists && acked == entry.majority {
+						println("Reach consensus?")
 						go func() {
 							log.DiskLock.Lock()
 							block(entry.key, entry.value)
@@ -88,7 +90,7 @@ func (node *Node) Connect(
 
 							log.LogLock.Lock()
 							delete(log.Entries, commitIndex)
-							fmt.Printf("Removed log entry: %d", commitIndex)
+							fmt.Printf("Removed log entry: %d\n", commitIndex)
 							log.LogLock.Unlock()
 						}()
 					}
