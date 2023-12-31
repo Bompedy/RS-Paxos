@@ -180,11 +180,11 @@ func (node *Node) Write(key []byte, value []byte) {
 		startIndex = endIndex
 	}
 
-	//err := node.Encoder.Encode(segments)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
+	err := node.Encoder.Encode(segments)
+	if err != nil {
+		panic(err)
+	}
+
 	//ok, err := node.Encoder.Verify(segments)
 	//if err != nil || !ok {
 	//	panic(err)
