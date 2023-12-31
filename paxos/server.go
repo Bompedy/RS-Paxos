@@ -192,32 +192,33 @@ func (node *Node) Write(key []byte, value []byte) {
 	if err != nil || !ok {
 		panic(err)
 	}
-
-	commitIndex := atomic.AddUint32(&CommitIndex, 1)
-	node.Log.Entries[commitIndex] = Entry{
-		key:      key,
-		value:    value,
-		acked:    0,
-		majority: uint32(node.Total - 1),
-	}
-
-	for i := range node.Clients {
-		go func(index int, client Client) {
-			shard := segments[index+1]
-			buffer := make([]byte, 13+len(key)+len(shard))
-			buffer[0] = OpWrite
-			binary.LittleEndian.PutUint32(buffer[1:5], commitIndex)
-			binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(key)))
-			binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(shard)))
-			keyIndex := 13 + len(key) //fix
-			copy(buffer[13:keyIndex], key)
-			copy(buffer[keyIndex:keyIndex+len(shard)], shard)
-			client.mutex.Lock()
-			err := client.Write(buffer)
-			client.mutex.Unlock()
-			if err != nil {
-				panic(err)
-			}
-		}(i, node.Clients[i])
-	}
+	fmt.Printf("Log: %v", node.Log)
+	fmt.Printf("Map: %v", node.Log.Entries)
+	//commitIndex := atomic.AddUint32(&CommitIndex, 1)
+	//node.Log.Entries[commitIndex] = Entry{
+	//	key:      key,
+	//	value:    value,
+	//	acked:    0,
+	//	majority: uint32(node.Total - 1),
+	//}
+	//
+	//for i := range node.Clients {
+	//	go func(index int, client Client) {
+	//		shard := segments[index+1]
+	//		buffer := make([]byte, 13+len(key)+len(shard))
+	//		buffer[0] = OpWrite
+	//		binary.LittleEndian.PutUint32(buffer[1:5], commitIndex)
+	//		binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(key)))
+	//		binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(shard)))
+	//		keyIndex := 13 + len(key) //fix
+	//		copy(buffer[13:keyIndex], key)
+	//		copy(buffer[keyIndex:keyIndex+len(shard)], shard)
+	//		client.mutex.Lock()
+	//		err := client.Write(buffer)
+	//		client.mutex.Unlock()
+	//		if err != nil {
+	//			panic(err)
+	//		}
+	//	}(i, node.Clients[i])
+	//}
 }
