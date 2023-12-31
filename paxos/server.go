@@ -80,7 +80,7 @@ func (node *Node) Connect(
 					entry, exists := log.Entries[commitIndex]
 					log.LogLock.Unlock()
 					acked := atomic.AddUint32(&entry.acked, 1)
-					fmt.Printf("Leader got response: %d, %d, %v", acked, entry.majority, exists)
+					fmt.Printf("Leader got response: %d, %d, %d, %v", commitIndex, acked, entry.majority, exists)
 					if exists && acked == entry.majority {
 						println("Reach consensus?")
 						go func() {
