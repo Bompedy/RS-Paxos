@@ -24,9 +24,6 @@ type Node struct {
 }
 
 func (node *Node) Connect(nodes []string) error {
-	defer node.Lock.Unlock()
-	node.Lock.Lock()
-
 	var waiter sync.WaitGroup
 	for _, address := range nodes {
 		waiter.Add(1)
@@ -39,6 +36,7 @@ func (node *Node) Connect(nodes []string) error {
 			for {
 				client, err = net.Dial("tcp", address)
 				if err != nil {
+					println("erroring")
 					continue
 				}
 				break
