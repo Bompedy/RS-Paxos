@@ -82,7 +82,7 @@ func (node *Node) Connect(
 					if exists && acked == entry.majority {
 						go func() {
 							block(entry.key, entry.value)
-							close(entry.condition)
+							//close(entry.condition)
 							node.Log.Lock.Lock()
 							delete(node.Log.Entries, commitIndex)
 							node.Log.Lock.Unlock()
@@ -220,5 +220,5 @@ func (node *Node) Write(key []byte, value []byte) {
 			}
 		}(i, node.Clients[i])
 	}
-	<-entry.condition
+	//<-entry.condition
 }
