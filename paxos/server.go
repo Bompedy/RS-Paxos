@@ -24,7 +24,7 @@ type Node struct {
 
 type Log struct {
 	Lock    *sync.Mutex
-	Entries map[uint32]Entry
+	Entries map[uint32]*Entry
 }
 
 type Entry struct {
@@ -191,7 +191,7 @@ func (node *Node) Write(key []byte, value []byte) {
 		panic(err)
 	}
 	commitIndex := atomic.AddUint32(&CommitIndex, 1)
-	node.Log.Entries[commitIndex] = Entry{
+	node.Log.Entries[commitIndex] = &Entry{
 		key:      key,
 		value:    value,
 		acked:    0,
