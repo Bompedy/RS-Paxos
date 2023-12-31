@@ -1,6 +1,9 @@
 package paxos
 
-import "net"
+import (
+	"net"
+	"sync"
+)
 
 func (client Client) Read(buffer []byte) error {
 	for start := 0; start != len(buffer); {
@@ -26,5 +29,6 @@ func (client Client) Write(buffer []byte) error {
 type Client struct {
 	index      uint8
 	connection net.Conn
+	mutex      *sync.Mutex
 	//buffer     []byte
 }

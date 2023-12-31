@@ -23,34 +23,70 @@ type Node struct {
 	Encoder reedsolomon.Encoder
 }
 
-func (node *Node) Connect(nodes []string) error {
+var diskLock sync.Mutex
+var logLock sync.Mutex
+var log map[uint32]Entry
+
+type Entry struct {
+	key      []byte
+	value    []byte
+	acked    uint32
+	majority uint32
+}
+
+func (node *Node) Connect(
+	nodes []string,
+	block func(key []byte, value []byte),
+) error {
 	var waiter sync.WaitGroup
 	for _, address := range nodes {
 		waiter.Add(1)
 		address := address
 		go func() {
 			defer waiter.Done()
-			var client net.Conn
+			var connection net.Conn
 			var err error
-			fmt.Printf("Connecting to: %s", address)
 			for {
-				client, err = net.Dial("tcp", address)
+				connection, err = net.Dial("tcp", address)
 				if err != nil {
-					println("erroring")
 					continue
 				}
 				break
 			}
-			fmt.Printf("Connected to: %s", address)
 			index, err := strconv.Atoi(string(address[len(address)-3]))
 			if err != nil {
 				panic(fmt.Sprintf("Can't parse address to index: %s", address))
 			}
-			node.Clients = append(node.Clients, Client{
-				connection: client,
+			client := Client{
+				connection: connection,
 				index:      uint8(index),
-				//buffer: make([]byte, 65535),
-			})
+				mutex:      &sync.Mutex{},
+			}
+			node.Clients = append(node.Clients, client)
+			buffer := make([]byte, 4)
+
+			// this is the leader
+			for {
+				err = client.Read(buffer)
+				if err != nil {
+					panic(err)
+				}
+				commitIndex := binary.LittleEndian.Uint32(buffer)
+				logLock.Lock()
+				entry, exists := log[commitIndex]
+				logLock.Unlock()
+				if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
+					go func() {
+						diskLock.Lock()
+						block(entry.key, entry.value)
+						diskLock.Unlock()
+
+						logLock.Lock()
+						delete(log, commitIndex)
+						logLock.Unlock()
+					}()
+				}
+			}
 		}()
 	}
 
@@ -65,63 +101,68 @@ func (node *Node) Accept(
 	address string,
 	block func(key []byte, value []byte),
 ) error {
-	fmt.Printf("Accepting on: %s", address)
-	listener, err := net.Listen("tcp", address)
-	if err != nil {
-		panic(err)
-	}
-
 	for {
-		client, err := listener.Accept()
+		// loop here cause port might be stuck open
+		listener, err := net.Listen("tcp", address)
 		if err != nil {
-			panic(err)
+			continue
 		}
 
-		connection := Client{
-			connection: client,
-			index:      0,
-		}
-
-		println("Recieved connection")
-
-		go func() {
-			buffer := make([]byte, 65535)
-			for {
-				err := connection.Read(buffer[:1])
-				if err != nil {
-					panic(err)
-				}
-
-				op := buffer[0]
-				if op == OpWrite {
-					err := connection.Read(buffer[:8])
-					if err != nil {
-						panic(err)
-					}
-					keySize := binary.LittleEndian.Uint32(buffer[:4])
-					valueSize := binary.LittleEndian.Uint32(buffer[4:8])
-					err = connection.Read(buffer[:(keySize + valueSize)])
-					if err != nil {
-						panic(err)
-					}
-
-					block(buffer[:keySize], buffer[keySize:(keySize+valueSize)])
-					err = connection.Write(buffer[:1])
-					if err != nil {
-						panic(err)
-					}
-				} else if op == OpCommit {
-					err = connection.Write(buffer[:1])
-					if err != nil {
-						panic(err)
-					}
-				}
+		for {
+			connection, err := listener.Accept()
+			if err != nil {
+				panic(err)
 			}
-		}()
+
+			client := Client{
+				connection: connection,
+				index:      0,
+			}
+
+			go func() {
+				buffer := make([]byte, 65535)
+				for {
+					err := client.Read(buffer[:1])
+					if err != nil {
+						panic(err)
+					}
+
+					op := buffer[0]
+					if op == OpWrite {
+						err := client.Read(buffer[:12])
+						if err != nil {
+							panic(err)
+						}
+						commitIndex := binary.LittleEndian.Uint32(buffer[:4])
+						keySize := binary.LittleEndian.Uint32(buffer[4:8])
+						valueSize := binary.LittleEndian.Uint32(buffer[8:12])
+						err = client.Read(buffer[:(keySize + valueSize)])
+						if err != nil {
+							panic(err)
+						}
+
+						block(buffer[:keySize], buffer[keySize:(keySize+valueSize)])
+						binary.LittleEndian.PutUint32(buffer[:4], commitIndex)
+						err = client.Write(buffer[:4])
+						if err != nil {
+							panic(err)
+						}
+					}
+					//else if op == OpCommit {
+					//	err = client.Write(buffer[:1])
+					//	if err != nil {
+					//		panic(err)
+					//	}
+					//}
+				}
+			}()
+		}
 	}
 }
 
-func (node *Node) Write(key []byte, value []byte) error {
+var CommitIndex uint32
+
+func (node *Node) Write(key []byte, value []byte) {
 	const numSegments = 3
 	const parity = 2
 	var segmentSize = int(math.Ceil(float64(len(value)) / float64(numSegments)))
@@ -146,45 +187,31 @@ func (node *Node) Write(key []byte, value []byte) error {
 		panic(err)
 	}
 
-	return node.quorum(func(index int, client Client) error {
-		// Add 1 since DS1 is the leaders segment
-		shard := segments[index+1]
-		buffer := make([]byte, 9+len(key)+len(shard))
-		buffer[0] = OpWrite
-		binary.LittleEndian.PutUint32(buffer[1:5], uint32(len(key)))
-		binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(shard)))
-		keyIndex := 9 + len(key)
-		copy(buffer[9:keyIndex], key)
-		copy(buffer[keyIndex:keyIndex+len(shard)], shard)
-		err := client.Write(buffer)
-		if err != nil {
-			panic(err)
-		}
-		return client.Read(make([]byte, 1))
-	})
-	return nil
-}
-
-func (node *Node) quorum(
-	block func(index int, client Client) error,
-) error {
-	var waiter sync.WaitGroup
-	waiter.Add(node.Total - 1)
-	var count = uint32(0)
+	commitIndex := atomic.AddUint32(&CommitIndex, 1)
+	log[commitIndex] = Entry{
+		key:      key,
+		value:    value,
+		acked:    0,
+		majority: uint32(node.Total - 1),
+	}
 
 	for i := range node.Clients {
-		client := node.Clients[i]
 		go func(index int, client Client) {
-			err := block(index, client)
+			shard := segments[index+1]
+			buffer := make([]byte, 13+len(key)+len(shard))
+			buffer[0] = OpWrite
+			binary.LittleEndian.PutUint32(buffer[1:5], commitIndex)
+			binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(key)))
+			binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(shard)))
+			keyIndex := 13 + len(key) //fix
+			copy(buffer[13:keyIndex], key)
+			copy(buffer[keyIndex:keyIndex+len(shard)], shard)
+			client.mutex.Lock()
+			err := client.Write(buffer)
+			client.mutex.Unlock()
 			if err != nil {
 				panic(err)
 			}
-			if atomic.AddUint32(&count, 1) <= uint32(node.Total-1) {
-				waiter.Done()
-			}
-		}(i, client)
+		}(i, node.Clients[i])
 	}
-
-	waiter.Wait()
-	return nil
 }
