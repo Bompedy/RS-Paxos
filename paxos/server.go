@@ -197,7 +197,8 @@ func (node *Node) Write(key []byte, value []byte) {
 		majority:  uint32(node.Total - 1),
 		condition: make(chan struct{}),
 	}
-	node.Log.Entries[commitIndex] = entry
+	fmt.Printf("Entry: %d - %v\n", commitIndex, entry)
+	//node.Log.Entries[commitIndex] = entry
 
 	//for i := range node.Clients {
 	//	go func(index int, client Client) {
