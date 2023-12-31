@@ -17,16 +17,14 @@ var OpCommit = uint8(1)
 
 type Node struct {
 	Clients []Client
-	Storage Storage
 	Total   int
-	Encoder reedsolomon.Encoder
-	Log     Log
+	Encoder *reedsolomon.Encoder
+	Log     *Log
 }
 
 type Log struct {
-	DiskLock *sync.Mutex
-	LogLock  *sync.Mutex
-	Entries  map[uint32]*Entry
+	Lock    sync.Mutex
+	Entries map[uint32]Entry
 }
 
 type Entry struct {
@@ -76,22 +74,20 @@ func (node *Node) Connect(
 					}
 					commitIndex := binary.LittleEndian.Uint32(buffer)
 					log := node.Log
-					log.LogLock.Lock()
+					log.Lock.Lock()
 					entry, exists := log.Entries[commitIndex]
-					log.LogLock.Unlock()
+					log.Lock.Unlock()
 					acked := atomic.AddUint32(&entry.acked, 1)
 					fmt.Printf("Leader got response: %d, %d, %d, %v\n", commitIndex, acked, entry.majority, exists)
 					if exists && acked == entry.majority {
 						println("Reach consensus?")
 						go func() {
-							log.DiskLock.Lock()
 							block(entry.key, entry.value)
-							log.DiskLock.Unlock()
 
-							log.LogLock.Lock()
+							log.Lock.Lock()
 							delete(log.Entries, commitIndex)
 							fmt.Printf("Removed log entry: %d\n", commitIndex)
-							log.LogLock.Unlock()
+							log.Lock.Unlock()
 						}()
 					}
 				}
@@ -186,17 +182,17 @@ func (node *Node) Write(key []byte, value []byte) {
 		startIndex = endIndex
 	}
 
-	err := node.Encoder.Encode(segments)
+	err := (*node.Encoder).Encode(segments)
 	if err != nil {
 		panic(err)
 	}
 
-	ok, err := node.Encoder.Verify(segments)
+	ok, err := (*node.Encoder).Verify(segments)
 	if err != nil || !ok {
 		panic(err)
 	}
 	commitIndex := atomic.AddUint32(&CommitIndex, 1)
-	node.Log.Entries[commitIndex] = &Entry{
+	node.Log.Entries[commitIndex] = Entry{
 		key:      key,
 		value:    value,
 		acked:    0,
