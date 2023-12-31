@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/klauspost/reedsolomon"
-	"math"
 	"net"
 	"sort"
 	"strconv"
@@ -82,7 +81,7 @@ func (node *Node) Connect(
 					if exists && acked == entry.majority {
 						go func() {
 							block(entry.key, entry.value)
-							//close(entry.condition)
+							close(entry.condition)
 							node.Log.Lock.Lock()
 							delete(node.Log.Entries, commitIndex)
 							node.Log.Lock.Unlock()
@@ -166,29 +165,29 @@ func (node *Node) Accept(
 var CommitIndex uint32
 
 func (node *Node) Write(key []byte, value []byte) {
-	const numSegments = 3
-	const parity = 2
-	var segmentSize = int(math.Ceil(float64(len(value)) / float64(numSegments)))
-	var segments = reedsolomon.AllocAligned(numSegments+parity, segmentSize)
-	var startIndex = 0
-	for i := range segments[:numSegments] {
-		endIndex := startIndex + segmentSize
-		if endIndex > len(value) {
-			endIndex = len(value)
-		}
-		copy(segments[i], value[startIndex:endIndex])
-		startIndex = endIndex
-	}
-
-	err := node.Encoder.Encode(segments)
-	if err != nil {
-		panic(err)
-	}
-
-	ok, err := node.Encoder.Verify(segments)
-	if err != nil || !ok {
-		panic(err)
-	}
+	//const numSegments = 3
+	//const parity = 2
+	//var segmentSize = int(math.Ceil(float64(len(value)) / float64(numSegments)))
+	//var segments = reedsolomon.AllocAligned(numSegments+parity, segmentSize)
+	//var startIndex = 0
+	//for i := range segments[:numSegments] {
+	//	endIndex := startIndex + segmentSize
+	//	if endIndex > len(value) {
+	//		endIndex = len(value)
+	//	}
+	//	copy(segments[i], value[startIndex:endIndex])
+	//	startIndex = endIndex
+	//}
+	//
+	//err := node.Encoder.Encode(segments)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//ok, err := node.Encoder.Verify(segments)
+	//if err != nil || !ok {
+	//	panic(err)
+	//}
 	commitIndex := atomic.AddUint32(&CommitIndex, 1)
 	entry := &Entry{
 		key:       key,
@@ -203,7 +202,8 @@ func (node *Node) Write(key []byte, value []byte) {
 
 	for i := range node.Clients {
 		go func(index int, client Client) {
-			shard := segments[index+1]
+			shard := value
+			//segments[index+1]
 			buffer := make([]byte, 13+len(key)+len(shard))
 			buffer[0] = OpWrite
 			binary.LittleEndian.PutUint32(buffer[1:5], commitIndex)
@@ -220,5 +220,5 @@ func (node *Node) Write(key []byte, value []byte) {
 			}
 		}(i, node.Clients[i])
 	}
-	//<-entry.condition
+	<-entry.condition
 }
