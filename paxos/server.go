@@ -18,7 +18,7 @@ var OpCommit = uint8(1)
 type Node struct {
 	Clients []Client
 	Total   int
-	Encoder *reedsolomon.Encoder
+	Encoder reedsolomon.Encoder
 	Log     *Log
 }
 
@@ -182,12 +182,12 @@ func (node *Node) Write(key []byte, value []byte) {
 		startIndex = endIndex
 	}
 
-	err := (*node.Encoder).Encode(segments)
+	err := node.Encoder.Encode(segments)
 	if err != nil {
 		panic(err)
 	}
 
-	ok, err := (*node.Encoder).Verify(segments)
+	ok, err := node.Encoder.Verify(segments)
 	if err != nil || !ok {
 		panic(err)
 	}
