@@ -185,10 +185,10 @@ func (node *Node) Write(key []byte, value []byte) {
 		panic(err)
 	}
 
-	//ok, err := node.Encoder.Verify(segments)
-	//if err != nil || !ok {
-	//	panic(err)
-	//}
+	ok, err := node.Encoder.Verify(segments)
+	if err != nil || !ok {
+		panic(err)
+	}
 	//commitIndex := atomic.AddUint32(&CommitIndex, 1)
 	//entry := &Entry{
 	//	key:       key,
