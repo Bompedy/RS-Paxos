@@ -18,7 +18,6 @@ var OpCommit = uint8(1)
 type Node struct {
 	Clients []Client
 	Storage Storage
-	Lock    sync.Mutex
 	Total   int
 	Encoder reedsolomon.Encoder
 	Log     Log
@@ -192,8 +191,9 @@ func (node *Node) Write(key []byte, value []byte) {
 	if err != nil || !ok {
 		panic(err)
 	}
-	fmt.Printf("Log: %v", node.Log)
-	fmt.Printf("Map: %v", node.Log.Entries)
+	fmt.Printf("Log: %v\n", node.Log)
+	fmt.Printf("Map: %v\n", node.Log.Entries)
+	println("Done")
 	//commitIndex := atomic.AddUint32(&CommitIndex, 1)
 	//node.Log.Entries[commitIndex] = Entry{
 	//	key:      key,
