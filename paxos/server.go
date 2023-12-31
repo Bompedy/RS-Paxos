@@ -35,6 +35,7 @@ func (node *Node) Connect(nodes []string) error {
 			defer waiter.Done()
 			var client net.Conn
 			var err error
+			fmt.Printf("Connecting to: %s", address)
 			for {
 				client, err = net.Dial("tcp", address)
 				if err != nil {
@@ -81,6 +82,8 @@ func (node *Node) Accept(
 			connection: client,
 			index:      0,
 		}
+
+		println("Recieved connection")
 
 		go func() {
 			buffer := make([]byte, 65535)
