@@ -199,24 +199,24 @@ func (node *Node) Write(key []byte, value []byte) {
 	}
 	node.Log.Entries[commitIndex] = entry
 
-	for i := range node.Clients {
-		go func(index int, client Client) {
-			shard := segments[index+1]
-			buffer := make([]byte, 13+len(key)+len(shard))
-			buffer[0] = OpWrite
-			binary.LittleEndian.PutUint32(buffer[1:5], commitIndex)
-			binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(key)))
-			binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(shard)))
-			keyIndex := 13 + len(key) //fix
-			copy(buffer[13:keyIndex], key)
-			copy(buffer[keyIndex:keyIndex+len(shard)], shard)
-			client.mutex.Lock()
-			err := client.Write(buffer)
-			client.mutex.Unlock()
-			if err != nil {
-				panic(err)
-			}
-		}(i, node.Clients[i])
-	}
+	//for i := range node.Clients {
+	//	go func(index int, client Client) {
+	//		shard := segments[index+1]
+	//		buffer := make([]byte, 13+len(key)+len(shard))
+	//		buffer[0] = OpWrite
+	//		binary.LittleEndian.PutUint32(buffer[1:5], commitIndex)
+	//		binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(key)))
+	//		binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(shard)))
+	//		keyIndex := 13 + len(key) //fix
+	//		copy(buffer[13:keyIndex], key)
+	//		copy(buffer[keyIndex:keyIndex+len(shard)], shard)
+	//		client.mutex.Lock()
+	//		err := client.Write(buffer)
+	//		client.mutex.Unlock()
+	//		if err != nil {
+	//			panic(err)
+	//		}
+	//	}(i, node.Clients[i])
+	//}
 	//<-entry.condition
 }
