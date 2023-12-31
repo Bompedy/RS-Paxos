@@ -21,11 +21,14 @@ type Node struct {
 	Lock    sync.Mutex
 	Total   int
 	Encoder reedsolomon.Encoder
+	Log     Log
 }
 
-var diskLock sync.Mutex
-var logLock sync.Mutex
-var log map[uint32]Entry
+type Log struct {
+	DiskLock *sync.Mutex
+	LogLock  *sync.Mutex
+	Entries  map[uint32]Entry
+}
 
 type Entry struct {
 	key      []byte
@@ -73,18 +76,19 @@ func (node *Node) Connect(
 						panic(err)
 					}
 					commitIndex := binary.LittleEndian.Uint32(buffer)
-					logLock.Lock()
-					entry, exists := log[commitIndex]
-					logLock.Unlock()
+					log := node.Log
+					log.LogLock.Lock()
+					entry, exists := log.Entries[commitIndex]
+					log.LogLock.Unlock()
 					if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
 						go func() {
-							diskLock.Lock()
+							log.DiskLock.Lock()
 							block(entry.key, entry.value)
-							diskLock.Unlock()
+							log.DiskLock.Unlock()
 
-							logLock.Lock()
-							delete(log, commitIndex)
-							logLock.Unlock()
+							log.LogLock.Lock()
+							delete(log.Entries, commitIndex)
+							log.LogLock.Unlock()
 						}()
 					}
 				}
@@ -190,7 +194,7 @@ func (node *Node) Write(key []byte, value []byte) {
 	}
 
 	commitIndex := atomic.AddUint32(&CommitIndex, 1)
-	log[commitIndex] = Entry{
+	node.Log.Entries[commitIndex] = Entry{
 		key:      key,
 		value:    value,
 		acked:    0,
