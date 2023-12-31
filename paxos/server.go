@@ -189,15 +189,15 @@ func (node *Node) Write(key []byte, value []byte) {
 	if err != nil || !ok {
 		panic(err)
 	}
-	//commitIndex := atomic.AddUint32(&CommitIndex, 1)
-	//entry := &Entry{
-	//	key:       key,
-	//	value:     value,
-	//	acked:     0,
-	//	majority:  uint32(node.Total - 1),
-	//	condition: make(chan struct{}),
-	//}
-	//node.Log.Entries[commitIndex] = entry
+	commitIndex := atomic.AddUint32(&CommitIndex, 1)
+	entry := &Entry{
+		key:       key,
+		value:     value,
+		acked:     0,
+		majority:  uint32(node.Total - 1),
+		condition: make(chan struct{}),
+	}
+	node.Log.Entries[commitIndex] = entry
 
 	//for i := range node.Clients {
 	//	go func(index int, client Client) {
