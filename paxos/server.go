@@ -78,12 +78,10 @@ func (node *Node) Connect(
 					entry, exists := node.Log.Entries[commitIndex]
 					node.Log.Lock.Unlock()
 					acked := atomic.AddUint32(&entry.acked, 1)
-					fmt.Printf("Leader got response: %d, %d, %d, %v\n", commitIndex, acked, entry.majority, exists)
+					//fmt.Printf("Leader got response: %d, %d, %d, %v\n", commitIndex, acked, entry.majority, exists)
 					if exists && acked == entry.majority {
-						println("Reach consensus?")
 						go func() {
 							block(entry.key, entry.value)
-							fmt.Printf("Removed log entry: %d\n", commitIndex)
 							close(entry.condition)
 							node.Log.Lock.Lock()
 							delete(node.Log.Entries, commitIndex)
@@ -221,5 +219,4 @@ func (node *Node) Write(key []byte, value []byte) {
 		}(i, node.Clients[i])
 	}
 	<-entry.condition
-	println("Completed write")
 }
