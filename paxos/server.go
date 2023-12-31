@@ -28,10 +28,11 @@ type Log struct {
 }
 
 type Entry struct {
-	key      []byte
-	value    []byte
-	acked    uint32
-	majority uint32
+	key       []byte
+	value     []byte
+	acked     uint32
+	majority  uint32
+	condition chan struct{}
 }
 
 func (node *Node) Connect(
@@ -82,10 +83,10 @@ func (node *Node) Connect(
 						println("Reach consensus?")
 						go func() {
 							block(entry.key, entry.value)
-
+							close(entry.condition)
+							fmt.Printf("Removed log entry: %d\n", commitIndex)
 							node.Log.Lock.Lock()
 							delete(node.Log.Entries, commitIndex)
-							fmt.Printf("Removed log entry: %d\n", commitIndex)
 							node.Log.Lock.Unlock()
 						}()
 					}
@@ -191,12 +192,14 @@ func (node *Node) Write(key []byte, value []byte) {
 		panic(err)
 	}
 	commitIndex := atomic.AddUint32(&CommitIndex, 1)
-	node.Log.Entries[commitIndex] = &Entry{
-		key:      key,
-		value:    value,
-		acked:    0,
-		majority: uint32(node.Total - 1),
+	entry := &Entry{
+		key:       key,
+		value:     value,
+		acked:     0,
+		majority:  uint32(node.Total - 1),
+		condition: make(chan struct{}),
 	}
+	node.Log.Entries[commitIndex] = entry
 
 	for i := range node.Clients {
 		go func(index int, client Client) {
@@ -217,4 +220,5 @@ func (node *Node) Write(key []byte, value []byte) {
 			}
 		}(i, node.Clients[i])
 	}
+	<-entry.condition
 }
