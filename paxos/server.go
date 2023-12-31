@@ -66,27 +66,29 @@ func (node *Node) Connect(
 			buffer := make([]byte, 4)
 
 			// this is the leader
-			for {
-				err = client.Read(buffer)
-				if err != nil {
-					panic(err)
-				}
-				commitIndex := binary.LittleEndian.Uint32(buffer)
-				logLock.Lock()
-				entry, exists := log[commitIndex]
-				logLock.Unlock()
-				if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
-					go func() {
-						diskLock.Lock()
-						block(entry.key, entry.value)
-						diskLock.Unlock()
+			go func() {
+				for {
+					err = client.Read(buffer)
+					if err != nil {
+						panic(err)
+					}
+					commitIndex := binary.LittleEndian.Uint32(buffer)
+					logLock.Lock()
+					entry, exists := log[commitIndex]
+					logLock.Unlock()
+					if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
+						go func() {
+							diskLock.Lock()
+							block(entry.key, entry.value)
+							diskLock.Unlock()
 
-						logLock.Lock()
-						delete(log, commitIndex)
-						logLock.Unlock()
-					}()
+							logLock.Lock()
+							delete(log, commitIndex)
+							logLock.Unlock()
+						}()
+					}
 				}
-			}
+			}()
 		}()
 	}
 
