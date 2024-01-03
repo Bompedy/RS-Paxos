@@ -139,6 +139,12 @@ func (node *Node) Accept(
 						commitIndex := binary.LittleEndian.Uint32(buffer[:4])
 						keySize := binary.LittleEndian.Uint32(buffer[4:8])
 						valueSize := binary.LittleEndian.Uint32(buffer[8:12])
+						required := int(keySize + valueSize)
+
+						if len(buffer) < required {
+							buffer = append(buffer, make([]byte, required-len(buffer))...)
+						}
+
 						err = client.Read(buffer[:(keySize + valueSize)])
 						if err != nil {
 							panic(err)
