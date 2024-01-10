@@ -174,7 +174,7 @@ var CommitIndex uint32
 func (node *Node) Write(key []byte, value []byte) {
 	//1gb, .33mb, .33mb, .33mb, x amount of size, x amount size
 
-	fmt.Printf("Value size: %d", len(value))
+	fmt.Printf("Value size: %s", string(value))
 	const numSegments = 3
 	const parity = 2
 	var segmentSize = int(math.Ceil(float64(len(value)) / float64(numSegments)))
