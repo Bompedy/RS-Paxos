@@ -100,10 +100,32 @@ func (node *Node) Connect(
 	return nil
 }
 
+type Task struct {
+	Key    []byte
+	Value  []byte
+	Commit uint32
+}
+
+var taskQueue = make(chan Task)
+
 func (node *Node) Accept(
 	address string,
-	block func(key []byte, value []byte),
+	writeToDisk func(key []byte, value []byte),
 ) error {
+	//go func() {
+	//	for task := range taskQueue {
+	//		go func(t Task) {
+	//			writeToDisk(t.Key, t.Value)
+	//			response := make([]byte, 4)
+	//			binary.LittleEndian.PutUint32(response, t.Commit)
+	//			mutex.Lock()
+	//			// Simulate client.Write
+	//			fmt.Printf("Processed commit index: %d\n", t.Commit)
+	//			mutex.Unlock()
+	//		}(task)
+	//	}
+	//}()
+
 	for {
 		// loop here cause port might be stuck open
 		listener, err := net.Listen("tcp", address)
@@ -124,6 +146,7 @@ func (node *Node) Accept(
 
 			go func() {
 				buffer := make([]byte, 65535)
+				mutex := sync.Mutex{}
 				for {
 					err := client.Read(buffer[:1])
 					if err != nil {
@@ -150,19 +173,18 @@ func (node *Node) Accept(
 							panic(err)
 						}
 
-						block(buffer[:keySize], buffer[keySize:(keySize+valueSize)])
-						binary.LittleEndian.PutUint32(buffer[:4], commitIndex)
-						err = client.Write(buffer[:4])
-						if err != nil {
-							panic(err)
-						}
+						go func() {
+							writeToDisk(buffer[:keySize], buffer[keySize:(keySize+valueSize)])
+							response := make([]byte, 4)
+							binary.LittleEndian.PutUint32(response, commitIndex)
+							mutex.Lock()
+							err = client.Write(response)
+							mutex.Unlock()
+							if err != nil {
+								panic(err)
+							}
+						}()
 					}
-					//else if op == OpCommit {
-					//	err = client.Write(buffer[:1])
-					//	if err != nil {
-					//		panic(err)
-					//	}
-					//}
 				}
 			}()
 		}
