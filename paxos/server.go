@@ -80,8 +80,8 @@ func (node *Node) Connect(
 					//fmt.Printf("Leader got response: %d, %d, %d, %v\n", commitIndex, acked, entry.majority, exists)
 					if exists && acked == entry.majority {
 						go func() {
-							//block(entry.key, entry.value)
-							//close(entry.condition)
+							block(entry.key, entry.value)
+							close(entry.condition)
 							node.Log.Lock.Lock()
 							delete(node.Log.Entries, commitIndex)
 							node.Log.Lock.Unlock()
@@ -213,7 +213,7 @@ func (node *Node) Write(
 	//	copy(segments[i], value[startIndex:endIndex])
 	//	startIndex = endIndex
 	//}
-
+	//
 	//err := node.Encoder.Encode(segments)
 	//if err != nil {
 	//	panic(err)
@@ -237,8 +237,8 @@ func (node *Node) Write(
 	//
 	//for i := range node.Clients {
 	//	go func(index int, client Client) {
-	//		//shard := segments[index+1]
-	//		shard := value
+	//		shard := segments[index+1]
+	//		//shard := value
 	//		buffer := make([]byte, 13+len(key)+len(shard))
 	//		buffer[0] = OpWrite
 	//		binary.LittleEndian.PutUint32(buffer[1:5], commitIndex)
@@ -255,8 +255,6 @@ func (node *Node) Write(
 	//		}
 	//	}(i, node.Clients[i])
 	//}
-
 	writeToDisk(key, value)
-
 	//<-entry.condition
 }
