@@ -80,7 +80,7 @@ func (node *Node) Connect(
 					//fmt.Printf("Leader got response: %d, %d, %d, %v\n", commitIndex, acked, entry.majority, exists)
 					if exists && acked == entry.majority {
 						go func() {
-							block(entry.key, entry.value)
+							//block(entry.key, entry.value)
 							//close(entry.condition)
 							node.Log.Lock.Lock()
 							delete(node.Log.Entries, commitIndex)
@@ -192,7 +192,11 @@ func (node *Node) Accept(
 
 var CommitIndex uint32
 
-func (node *Node) Write(key []byte, value []byte) {
+func (node *Node) Write(
+	key []byte,
+	value []byte,
+	writeToDisk func(key []byte, value []byte),
+) {
 	//1gb, .33mb, .33mb, .33mb, x amount of size, x amount size
 
 	//fmt.Printf("Value size: %s", string(value))
@@ -251,5 +255,8 @@ func (node *Node) Write(key []byte, value []byte) {
 			}
 		}(i, node.Clients[i])
 	}
+
+	writeToDisk(key, value)
+
 	//<-entry.condition
 }
