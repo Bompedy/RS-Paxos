@@ -223,38 +223,38 @@ func (node *Node) Write(
 	//if err != nil || !ok {
 	//	panic(err)
 	//}
-	commitIndex := atomic.AddUint32(&CommitIndex, 1)
-	entry := &Entry{
-		key:       key,
-		value:     value,
-		acked:     0,
-		majority:  uint32(node.Total - 1),
-		condition: make(chan struct{}),
-	}
-	node.Log.Lock.Lock()
-	node.Log.Entries[commitIndex] = entry
-	node.Log.Lock.Unlock()
-
-	for i := range node.Clients {
-		go func(index int, client Client) {
-			//shard := segments[index+1]
-			shard := value
-			buffer := make([]byte, 13+len(key)+len(shard))
-			buffer[0] = OpWrite
-			binary.LittleEndian.PutUint32(buffer[1:5], commitIndex)
-			binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(key)))
-			binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(shard)))
-			keyIndex := 13 + len(key) //fix
-			copy(buffer[13:keyIndex], key)
-			copy(buffer[keyIndex:keyIndex+len(shard)], shard)
-			client.mutex.Lock()
-			err := client.Write(buffer)
-			client.mutex.Unlock()
-			if err != nil {
-				panic(err)
-			}
-		}(i, node.Clients[i])
-	}
+	//commitIndex := atomic.AddUint32(&CommitIndex, 1)
+	//entry := &Entry{
+	//	key:       key,
+	//	value:     value,
+	//	acked:     0,
+	//	majority:  uint32(node.Total - 1),
+	//	condition: make(chan struct{}),
+	//}
+	//node.Log.Lock.Lock()
+	//node.Log.Entries[commitIndex] = entry
+	//node.Log.Lock.Unlock()
+	//
+	//for i := range node.Clients {
+	//	go func(index int, client Client) {
+	//		//shard := segments[index+1]
+	//		shard := value
+	//		buffer := make([]byte, 13+len(key)+len(shard))
+	//		buffer[0] = OpWrite
+	//		binary.LittleEndian.PutUint32(buffer[1:5], commitIndex)
+	//		binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(key)))
+	//		binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(shard)))
+	//		keyIndex := 13 + len(key) //fix
+	//		copy(buffer[13:keyIndex], key)
+	//		copy(buffer[keyIndex:keyIndex+len(shard)], shard)
+	//		client.mutex.Lock()
+	//		err := client.Write(buffer)
+	//		client.mutex.Unlock()
+	//		if err != nil {
+	//			panic(err)
+	//		}
+	//	}(i, node.Clients[i])
+	//}
 
 	writeToDisk(key, value)
 
