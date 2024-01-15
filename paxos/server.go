@@ -120,7 +120,6 @@ func (node *Node) Accept(
 				break
 			}
 			writeToDisk(task.Key, task.Value)
-			println("hit disk")
 			close(task.Condition)
 		}
 	}()
