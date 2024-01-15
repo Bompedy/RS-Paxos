@@ -109,7 +109,7 @@ var taskQueue = make(chan *Task)
 
 func (node *Node) Accept(
 	address string,
-	writeToDisk func(key []byte, value []byte),
+	block func(key []byte, value []byte),
 ) error {
 
 	go func() {
@@ -119,7 +119,7 @@ func (node *Node) Accept(
 				println("There was some error!")
 				break
 			}
-			writeToDisk(task.Key, task.Value)
+			block(task.Key, task.Value)
 			close(task.Condition)
 		}
 	}()
@@ -172,7 +172,7 @@ func (node *Node) Accept(
 						}
 
 						go func() {
-							writeToDisk(buffer[:keySize], buffer[keySize:(keySize+valueSize)])
+							block(buffer[:keySize], buffer[keySize:(keySize+valueSize)])
 							response := make([]byte, 4)
 							binary.LittleEndian.PutUint32(response, commitIndex)
 							mutex.Lock()
@@ -194,7 +194,7 @@ var CommitIndex uint32
 func (node *Node) Write(
 	key []byte,
 	value []byte,
-	writeToDisk func(key []byte, value []byte),
+	block func(key []byte, value []byte),
 ) {
 	task := &Task{
 		Key:       key,
@@ -262,6 +262,6 @@ func (node *Node) Write(
 	//		}
 	//	}(i, node.Clients[i])
 	//}
-	writeToDisk(key, value)
+	//writeToDisk(key, value)
 	//<-entry.condition
 }
