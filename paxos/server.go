@@ -100,30 +100,30 @@ func (node *Node) Connect(
 }
 
 type Task struct {
-	Key    []byte
-	Value  []byte
-	Commit uint32
+	Key       []byte
+	Value     []byte
+	Condition chan struct{}
 }
 
-var taskQueue = make(chan Task)
+var taskQueue = make(chan *Task)
 
 func (node *Node) Accept(
 	address string,
 	writeToDisk func(key []byte, value []byte),
 ) error {
-	//go func() {
-	//	for task := range taskQueue {
-	//		go func(t Task) {
-	//			writeToDisk(t.Key, t.Value)
-	//			response := make([]byte, 4)
-	//			binary.LittleEndian.PutUint32(response, t.Commit)
-	//			mutex.Lock()
-	//			// Simulate client.Write
-	//			fmt.Printf("Processed commit index: %d\n", t.Commit)
-	//			mutex.Unlock()
-	//		}(task)
-	//	}
-	//}()
+
+	go func() {
+		for {
+			task, ok := <-taskQueue
+			if !ok {
+				println("There was some error!")
+				break
+			}
+			writeToDisk(task.Key, task.Value)
+			println("hit disk")
+			close(task.Condition)
+		}
+	}()
 
 	for {
 		// loop here cause port might be stuck open
@@ -197,6 +197,14 @@ func (node *Node) Write(
 	value []byte,
 	writeToDisk func(key []byte, value []byte),
 ) {
+	task := &Task{
+		Key:       key,
+		Value:     value,
+		Condition: make(chan struct{}),
+	}
+	taskQueue <- task
+	<-task.Condition
+
 	//1gb, .33mb, .33mb, .33mb, x amount of size, x amount size
 
 	//fmt.Printf("Value size: %s", string(value))
