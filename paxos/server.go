@@ -77,7 +77,7 @@ func (node *Node) Connect(
 					node.Log.Lock.Lock()
 					entry, exists := node.Log.Entries[commitIndex]
 					node.Log.Lock.Unlock()
-					println("Does it exist: ", exists)
+					//println("Does it exist: ", exists)
 
 					//fmt.Printf("Leader got response: %d, %d, %d, %v\n", commitIndex, acked, entry.majority, exists)
 					if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
