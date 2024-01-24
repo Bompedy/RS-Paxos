@@ -77,9 +77,10 @@ func (node *Node) Connect(
 					node.Log.Lock.Lock()
 					entry, exists := node.Log.Entries[commitIndex]
 					node.Log.Lock.Unlock()
-					acked := atomic.AddUint32(&entry.acked, 1)
+					println("Does it exist: ", exists)
+
 					//fmt.Printf("Leader got response: %d, %d, %d, %v\n", commitIndex, acked, entry.majority, exists)
-					if exists && acked == entry.majority {
+					if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
 						go func() {
 							block(entry.key, entry.value)
 							close(entry.condition)
