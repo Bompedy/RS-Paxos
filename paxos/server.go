@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/klauspost/reedsolomon"
+	"math"
 	"net"
 	"sort"
 	"strconv"
@@ -192,76 +193,75 @@ func (node *Node) Accept(
 var CommitIndex uint32
 
 func (node *Node) Write(
+	numSegments int,
+	parity int,
 	key []byte,
 	value []byte,
 	block func(key []byte, value []byte),
 ) {
-	task := &Task{
-		Key:       key,
-		Value:     value,
-		Condition: make(chan struct{}),
-	}
-	taskQueue <- task
-	<-task.Condition
+	//task := &Task{
+	//	Key:       key,
+	//	Value:     value,
+	//	Condition: make(chan struct{}),
+	//}
+	//taskQueue <- task
+	//<-task.Condition
 
 	//1gb, .33mb, .33mb, .33mb, x amount of size, x amount size
 
-	//fmt.Printf("Value size: %s", string(value))
-	//const numSegments = 3
-	//const parity = 2
-	//var segmentSize = int(math.Ceil(float64(len(value)) / float64(numSegments)))
-	//var segments = reedsolomon.AllocAligned(numSegments+parity, segmentSize)
-	//var startIndex = 0
-	//for i := range segments[:numSegments] {
-	//	endIndex := startIndex + segmentSize
-	//	if endIndex > len(value) {
-	//		endIndex = len(value)
-	//	}
-	//	copy(segments[i], value[startIndex:endIndex])
-	//	startIndex = endIndex
-	//}
-	//
-	//err := node.Encoder.Encode(segments)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//ok, err := node.Encoder.Verify(segments)
-	//if err != nil || !ok {
-	//	panic(err)
-	//}
-	//commitIndex := atomic.AddUint32(&CommitIndex, 1)
-	//entry := &Entry{
-	//	key:       key,
-	//	value:     value,
-	//	acked:     0,
-	//	majority:  uint32(node.Total - 1),
-	//	condition: make(chan struct{}),
-	//}
-	//node.Log.Lock.Lock()
-	//node.Log.Entries[commitIndex] = entry
-	//node.Log.Lock.Unlock()
-	//
-	//for i := range node.Clients {
-	//	go func(index int, client Client) {
-	//		shard := segments[index+1]
-	//		//shard := value
-	//		buffer := make([]byte, 13+len(key)+len(shard))
-	//		buffer[0] = OpWrite
-	//		binary.LittleEndian.PutUint32(buffer[1:5], commitIndex)
-	//		binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(key)))
-	//		binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(shard)))
-	//		keyIndex := 13 + len(key) //fix
-	//		copy(buffer[13:keyIndex], key)
-	//		copy(buffer[keyIndex:keyIndex+len(shard)], shard)
-	//		client.mutex.Lock()
-	//		err := client.Write(buffer)
-	//		client.mutex.Unlock()
-	//		if err != nil {
-	//			panic(err)
-	//		}
-	//	}(i, node.Clients[i])
-	//}
-	//writeToDisk(key, value)
-	//<-entry.condition
+	var segmentSize = int(math.Ceil(float64(len(value)) / float64(numSegments)))
+	var segments = reedsolomon.AllocAligned(numSegments+parity, segmentSize)
+	var startIndex = 0
+	for i := range segments[:numSegments] {
+		endIndex := startIndex + segmentSize
+		if endIndex > len(value) {
+			endIndex = len(value)
+		}
+		copy(segments[i], value[startIndex:endIndex])
+		startIndex = endIndex
+	}
+
+	err := node.Encoder.Encode(segments)
+	if err != nil {
+		panic(err)
+	}
+
+	ok, err := node.Encoder.Verify(segments)
+	if err != nil || !ok {
+		panic(err)
+	}
+	commitIndex := atomic.AddUint32(&CommitIndex, 1)
+	entry := &Entry{
+		key:       key,
+		value:     value,
+		acked:     0,
+		majority:  uint32(node.Total - 1),
+		condition: make(chan struct{}),
+	}
+	node.Log.Lock.Lock()
+	node.Log.Entries[commitIndex] = entry
+	node.Log.Lock.Unlock()
+
+	for i := range node.Clients {
+		go func(index int, client Client) {
+			shard := segments[index+1]
+			//shard := value
+			buffer := make([]byte, 13+len(key)+len(shard))
+			buffer[0] = OpWrite
+			binary.LittleEndian.PutUint32(buffer[1:5], commitIndex)
+			binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(key)))
+			binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(shard)))
+			keyIndex := 13 + len(key) //fix
+			copy(buffer[13:keyIndex], key)
+			copy(buffer[keyIndex:keyIndex+len(shard)], shard)
+			client.mutex.Lock()
+			err := client.Write(buffer)
+			client.mutex.Unlock()
+			if err != nil {
+				panic(err)
+			}
+		}(i, node.Clients[i])
+	}
+	//block(key, value)
+	<-entry.condition
 }
