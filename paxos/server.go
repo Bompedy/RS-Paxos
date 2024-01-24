@@ -235,7 +235,7 @@ func (node *Node) Write(
 		key:       key,
 		value:     value,
 		acked:     0,
-		majority:  uint32(node.Total - 1),
+		majority:  uint32(numSegments),
 		condition: make(chan struct{}),
 	}
 	node.Log.Lock.Lock()
