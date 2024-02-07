@@ -6,8 +6,6 @@ import (
 	"github.com/klauspost/reedsolomon"
 	"math"
 	"net"
-	"sort"
-	"strconv"
 	"sync"
 	"sync/atomic"
 )
@@ -36,13 +34,17 @@ type Entry struct {
 }
 
 func (node *Node) Connect(
+	local string,
 	nodes []string,
 	block func(key []byte, value []byte),
 ) error {
 	var waiter sync.WaitGroup
 	for _, address := range nodes {
+		if address == local {
+			continue
+		}
 		waiter.Add(1)
-		address := address
+		address := fmt.Sprintf("%s:2000", address)
 		go func() {
 			defer waiter.Done()
 			var connection net.Conn
@@ -54,13 +56,8 @@ func (node *Node) Connect(
 				}
 				break
 			}
-			index, err := strconv.Atoi(string(address[len(address)-3]))
-			if err != nil {
-				panic(fmt.Sprintf("Can't parse address to index: %s", address))
-			}
 			client := Client{
 				connection: connection,
-				index:      uint8(index),
 				mutex:      &sync.Mutex{},
 			}
 			node.Clients = append(node.Clients, client)
@@ -95,9 +92,6 @@ func (node *Node) Connect(
 	}
 
 	waiter.Wait()
-	sort.Slice(node.Clients, func(i, j int) bool {
-		return node.Clients[i].index < node.Clients[j].index
-	})
 	return nil
 }
 
@@ -128,7 +122,7 @@ func (node *Node) Accept(
 
 	for {
 		// loop here cause port might be stuck open
-		listener, err := net.Listen("tcp", address)
+		listener, err := net.Listen("tcp", fmt.Sprintf("%s:2000", address))
 		if err != nil {
 			continue
 		}
@@ -141,7 +135,6 @@ func (node *Node) Accept(
 
 			client := Client{
 				connection: connection,
-				index:      0,
 			}
 
 			go func() {
