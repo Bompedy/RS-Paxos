@@ -14,10 +14,13 @@ var OpWrite = uint8(0)
 var OpCommit = uint8(1)
 
 type Node struct {
-	Clients []Client
-	Total   int
-	Encoder reedsolomon.Encoder
-	Log     Log
+	Clients  []Client
+	Total    int
+	Encoder  reedsolomon.Encoder
+	Log      Log
+	Quorum   int
+	Parity   int
+	Segments int
 }
 
 type Log struct {
@@ -187,8 +190,6 @@ func (node *Node) Accept(
 var CommitIndex uint32
 
 func (node *Node) Write(
-	numSegments int,
-	parity int,
 	key []byte,
 	value []byte,
 	block func(key []byte, value []byte),
@@ -203,10 +204,10 @@ func (node *Node) Write(
 
 	//1gb, .33mb, .33mb, .33mb, x amount of size, x amount size
 
-	var segmentSize = int(math.Ceil(float64(len(value)) / float64(numSegments)))
-	var segments = reedsolomon.AllocAligned(numSegments+parity, segmentSize)
+	var segmentSize = int(math.Ceil(float64(len(value)) / float64(node.Segments)))
+	var segments = reedsolomon.AllocAligned(node.Segments+node.Parity, segmentSize)
 	var startIndex = 0
-	for i := range segments[:numSegments] {
+	for i := range segments[:node.Segments] {
 		endIndex := startIndex + segmentSize
 		if endIndex > len(value) {
 			endIndex = len(value)
@@ -229,7 +230,7 @@ func (node *Node) Write(
 		key:       key,
 		value:     value,
 		acked:     0,
-		majority:  uint32(numSegments),
+		majority:  uint32(node.Quorum),
 		condition: make(chan struct{}),
 	}
 	node.Log.Lock.Lock()
