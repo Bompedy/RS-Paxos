@@ -194,16 +194,6 @@ func (node *Node) Write(
 	value []byte,
 	block func(key []byte, value []byte),
 ) {
-	//task := &Task{
-	//	Key:       key,
-	//	Value:     value,
-	//	Condition: make(chan struct{}),
-	//}
-	//taskQueue <- task
-	//<-task.Condition
-
-	//1gb, .33mb, .33mb, .33mb, x amount of size, x amount size
-
 	var segmentSize = int(math.Ceil(float64(len(value)) / float64(node.Segments)))
 	var segments = reedsolomon.AllocAligned(node.Segments+node.Parity, segmentSize)
 	var startIndex = 0
@@ -257,6 +247,6 @@ func (node *Node) Write(
 			}
 		}(i, node.Clients[i])
 	}
-	//block(key, value)
+	block(key, value)
 	<-entry.condition
 }
