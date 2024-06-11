@@ -251,6 +251,6 @@ func (node *Node) Write(
 		}(i, node.Clients[i])
 	}
 
-	block(key, value)
+	//block(key, value)
 	<-entry.condition
 }
