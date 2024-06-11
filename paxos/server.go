@@ -194,7 +194,7 @@ func (node *Node) Write(
 	value []byte,
 	block func(key []byte, value []byte),
 ) {
-	fmt.Printf("Total size: %d", len(value))
+	//fmt.Printf("Total size: %d", len(value))
 	var segmentSize = int(math.Ceil(float64(len(value)) / float64(node.Segments)))
 	var segments = reedsolomon.AllocAligned(node.Segments+node.Parity, segmentSize)
 	var startIndex = 0
@@ -241,7 +241,7 @@ func (node *Node) Write(
 			keyIndex := 13 + len(key) //fix
 			copy(buffer[13:keyIndex], key)
 			copy(buffer[keyIndex:keyIndex+len(shard)], shard)
-			fmt.Printf("Writing shard: %d\n", shard)
+			//fmt.Printf("Writing shard: %d\n", shard)
 			client.mutex.Lock()
 			err := client.Write(buffer)
 			client.mutex.Unlock()
