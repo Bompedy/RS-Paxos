@@ -201,7 +201,7 @@ func (node *Node) Accept(
 							println("Finished forwarding write from leader!")
 						}()
 					} else if op == OpAck {
-						fmt.Printf("Got ack from %d%n", index)
+						fmt.Printf("Got ack from %d\n", index)
 						err = reader.Read(buffer)
 						if err != nil {
 							panic(err)
