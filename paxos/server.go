@@ -130,7 +130,7 @@ func (node *Node) Accept(
 					op := buffer[0]
 					//fmt.Printf("Got op: %d %d\n", index, op)
 					if op == OpPropose {
-						fmt.Printf("Got proposal from: %d\n", index)
+						//fmt.Printf("Got proposal from: %d\n", index)
 						err := reader.Read(buffer[:12])
 						if err != nil {
 							panic(err)
@@ -175,7 +175,7 @@ func (node *Node) Accept(
 						}
 						node.Log.Lock.Lock()
 						node.Log.Entries[slot] = entry
-						fmt.Printf("Placed entry into slot: %d\n", slot)
+						//fmt.Printf("Placed entry into slot: %d\n", slot)
 						node.Log.Lock.Unlock()
 
 						go func() {
@@ -191,10 +191,10 @@ func (node *Node) Accept(
 							if err != nil {
 								panic(err)
 							}
-							fmt.Printf("Acked back to: %d\n", index)
+							//fmt.Printf("Acked back to: %d\n", index)
 						}()
 					} else if op == OpForward {
-						fmt.Printf("Got forward from: %d\n", index)
+						//fmt.Printf("Got forward from: %d\n", index)
 						err := reader.Read(buffer[:8])
 						if err != nil {
 							panic(err)
@@ -212,7 +212,7 @@ func (node *Node) Accept(
 						copy(value, buffer[keySize:(keySize+valueSize)])
 						go func() {
 							node.Write(key, value, false)
-							println("Finished forwarding write from leader!")
+							//println("Finished forwarding write from leader!")
 						}()
 					} else if op == OpAck {
 						fmt.Printf("Got ack from %d\n", index)
@@ -289,7 +289,7 @@ func (node *Node) Accept(
 						}
 						//}()
 					} else if op == OpCommit {
-						println("Got commit")
+						//println("Got commit")
 						commitBuffer := make([]byte, 4)
 						err = reader.Read(commitBuffer)
 						if err != nil {
@@ -297,12 +297,12 @@ func (node *Node) Accept(
 						}
 
 						next := binary.LittleEndian.Uint32(commitBuffer[:4])
-						fmt.Printf("Going to commit up to %d\n", next)
+						//fmt.Printf("Going to commit up to %d\n", next)
 
 						go func() {
 							for {
 								current := atomic.LoadUint32(&CommitIndex) + 1
-								fmt.Printf("Looping %d up to %d\n", current, next)
+								//fmt.Printf("Looping %d up to %d\n", current, next)
 								if current > next {
 									fmt.Printf("Too big\n")
 									break
@@ -310,7 +310,7 @@ func (node *Node) Accept(
 								//
 
 								node.Log.Lock.Lock()
-								fmt.Printf("Looking for log entry %d\n", current)
+								//fmt.Printf("Looking for log entry %d\n", current)
 								entry, exists := node.Log.Entries[current]
 								delete(node.Log.Entries, current)
 								node.Log.Lock.Unlock()
@@ -320,13 +320,13 @@ func (node *Node) Accept(
 								}
 
 								if !exists {
-									fmt.Printf("Couldn't find entry %d\n", current)
+									//fmt.Printf("Couldn't find entry %d\n", current)
 									panic("major problem")
 								}
 
 								etcdWrite(entry.key, entry.value)
 								if entry.condition != nil {
-									fmt.Printf("Closing condition in commit\n")
+									//fmt.Printf("Closing condition in commit\n")
 									close(entry.condition)
 								}
 
@@ -334,7 +334,7 @@ func (node *Node) Accept(
 								keyString := string(entry.key)
 								channel := node.RequestWaiter[keyString]
 								if channel != nil {
-									fmt.Printf("Closing request in commit\n")
+									//fmt.Printf("Closing request in commit\n")
 									close(channel)
 								}
 								delete(node.RequestWaiter, keyString)
