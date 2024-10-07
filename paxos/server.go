@@ -311,7 +311,7 @@ func (node *Node) Accept(
 								node.Log.Lock.Unlock()
 
 								if !exists {
-									fmt.Printf("Couldn't find entry %d", i)
+									fmt.Printf("Couldn't find entry %d\n", i)
 									panic("major problem")
 								}
 
