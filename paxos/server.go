@@ -330,6 +330,7 @@ func (node *Node) Accept(
 							}
 
 							node.RequestLock.Lock()
+							fmt.Printf("Total in there: %d\n", len(node.RequestWaiter))
 							keyString := string(entry.key)
 							channel := node.RequestWaiter[keyString]
 							if channel != nil {
@@ -340,10 +341,10 @@ func (node *Node) Accept(
 							node.RequestLock.Unlock()
 						}
 
-						fmt.Printf("Unlocking follower lock\n")
+						fmt.Printf("We commited up to %d\n", atomic.LoadUint32(&CommitIndex))
 						CommitLock.Unlock()
 
-						fmt.Printf("We commited up to %d\n", atomic.LoadUint32(&CommitIndex))
+						//fmt.Printf("We commited up to %d\n", atomic.LoadUint32(&CommitIndex))
 
 						//}()
 
