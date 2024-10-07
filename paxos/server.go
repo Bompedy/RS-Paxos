@@ -240,10 +240,6 @@ func (node *Node) Accept(
 								entry.lock.Unlock()
 								if majority {
 									CommitLock.Lock()
-									//if entry.condition != nil {
-									//	fmt.Printf("Closing entry condition in ack\n")
-									//	close(entry.condition)
-									//}
 									start := CommitIndex
 									for {
 										next := CommitIndex + 1
@@ -284,24 +280,24 @@ func (node *Node) Accept(
 										fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
 									}
 
-									//
-									//commitBuffer := make([]byte, 5)
-									//commitBuffer[0] = OpCommit
-									//binary.LittleEndian.PutUint32(commitBuffer[1:5], CommitIndex)
-									//fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
-									//for i := 0; i < node.Total; i++ {
-									//	if i == node.Index {
-									//		continue
-									//	}
-									//	client := node.Clients[i]
-									//	//go func(index int, client Client) {
-									//	client.mutex.Lock()
-									//	err := client.Write(commitBuffer)
-									//	if err != nil {
-									//		panic("error writing!")
-									//	}
-									//	client.mutex.Unlock()
-									//	//}(i, node.Clients[i])
+									commitBuffer := make([]byte, 5)
+									commitBuffer[0] = OpCommit
+									binary.LittleEndian.PutUint32(commitBuffer[1:5], CommitIndex)
+									fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
+									for i := 0; i < node.Total; i++ {
+										if i == node.Index {
+											continue
+										}
+										client := node.Clients[i]
+										//go func(index int, client Client) {
+										client.mutex.Lock()
+										err := client.Write(commitBuffer)
+										if err != nil {
+											panic("error writing!")
+										}
+										client.mutex.Unlock()
+									}
+									//(i, node.Clients[i])
 									CommitLock.Unlock()
 								}
 
