@@ -332,6 +332,8 @@ func (node *Node) Accept(
 								delete(node.RequestWaiter, keyString)
 								node.RequestLock.Unlock()
 
+								fmt.Printf("i=%d vs current=%d", i, current)
+
 								for i > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, i) {
 									current = atomic.LoadUint32(&CommitIndex)
 								}
