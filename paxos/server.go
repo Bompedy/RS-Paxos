@@ -202,11 +202,11 @@ func (node *Node) Accept(
 						}()
 					} else if op == OpAck {
 						fmt.Printf("Got ack from %d\n", index)
-						err = reader.Read(buffer)
+						err = reader.Read(buffer[:4])
 						if err != nil {
 							panic(err)
 						}
-						slot := binary.LittleEndian.Uint32(buffer)
+						slot := binary.LittleEndian.Uint32(buffer[:4])
 						go func() {
 							node.Log.Lock.Lock()
 							entry, exists := node.Log.Entries[slot]
@@ -410,4 +410,5 @@ func (node *Node) Write(
 	if wait {
 		<-entry.condition
 	}
+	println("passed condition!")
 }
