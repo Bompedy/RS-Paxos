@@ -71,6 +71,12 @@ func (node *Node) Connect(
 				connection: connection,
 				mutex:      &sync.Mutex{},
 			}
+			indexBuffer := make([]byte, 1)
+			indexBuffer[0] = uint8(node.Index)
+			err = client.Write(indexBuffer)
+			if err != nil {
+				panic("Error writing index!")
+			}
 			node.Clients = append(node.Clients, client)
 		}()
 	}
@@ -97,16 +103,19 @@ func (node *Node) Accept(
 				panic(err)
 			}
 
-			client := Client{
+			reader := Client{
 				connection: connection,
 			}
 
+			indexBuffer := make([]byte, 1)
+			err = reader.Read(indexBuffer)
+			index := uint32(indexBuffer[0])
+
 			go func() {
 				buffer := make([]byte, 65535)
-				mutex := sync.Mutex{}
 				for {
 					println("Got OP")
-					err := client.Read(buffer[:1])
+					err := reader.Read(buffer[:1])
 					if err != nil {
 						panic(err)
 					}
@@ -114,7 +123,7 @@ func (node *Node) Accept(
 					println("Received OP: %d", op)
 					if op == OpPropose {
 						println("Got proposal")
-						err := client.Read(buffer[:12])
+						err := reader.Read(buffer[:12])
 						if err != nil {
 							panic(err)
 						}
@@ -127,7 +136,7 @@ func (node *Node) Accept(
 							buffer = append(buffer, make([]byte, required-len(buffer))...)
 						}
 
-						err = client.Read(buffer[:(keySize + valueSize)])
+						err = reader.Read(buffer[:(keySize + valueSize)])
 						if err != nil {
 							panic(err)
 						}
@@ -154,9 +163,10 @@ func (node *Node) Accept(
 							response := make([]byte, 5)
 							response[0] = OpAck
 							binary.LittleEndian.PutUint32(response[1:], slot)
-							mutex.Lock()
+							client := node.Clients[index]
+							client.mutex.Lock()
 							err = client.Write(response)
-							mutex.Unlock()
+							client.mutex.Unlock()
 							if err != nil {
 								panic(err)
 							}
@@ -164,7 +174,7 @@ func (node *Node) Accept(
 						}()
 					} else if op == OpForward {
 						println("Got forward")
-						err := client.Read(buffer[:8])
+						err := reader.Read(buffer[:8])
 						if err != nil {
 							panic(err)
 						}
@@ -174,7 +184,7 @@ func (node *Node) Accept(
 						if len(buffer) < required {
 							buffer = append(buffer, make([]byte, required-len(buffer))...)
 						}
-						err = client.Read(buffer[:(keySize + valueSize)])
+						err = reader.Read(buffer[:(keySize + valueSize)])
 						key := make([]byte, keySize)
 						value := make([]byte, valueSize)
 						copy(key, buffer[:keySize])
@@ -185,7 +195,7 @@ func (node *Node) Accept(
 						}()
 					} else if op == OpAck {
 						println("Got ack")
-						err = client.Read(buffer)
+						err = reader.Read(buffer)
 						if err != nil {
 							panic(err)
 						}
@@ -245,7 +255,7 @@ func (node *Node) Accept(
 					} else if op == OpCommit {
 						println("Got commit")
 						commitBuffer := make([]byte, 4)
-						err = client.Read(commitBuffer)
+						err = reader.Read(commitBuffer)
 						if err != nil {
 							panic(err)
 						}
