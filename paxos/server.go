@@ -135,6 +135,7 @@ func (node *Node) Accept(
 						value := make([]byte, valueSize)
 						copy(key, buffer[:keySize])
 						copy(value, buffer[keySize:(keySize+valueSize)])
+						println("Gonna ack back!")
 
 						go func() {
 							entry := &Entry{
@@ -158,6 +159,7 @@ func (node *Node) Accept(
 							if err != nil {
 								panic(err)
 							}
+							println("Acked back")
 						}()
 					} else if op == OpForward {
 						println("Got forward")
