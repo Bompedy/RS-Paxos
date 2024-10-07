@@ -220,7 +220,7 @@ func (node *Node) Accept(
 							panic(err)
 						}
 						slot := binary.LittleEndian.Uint32(buffer[:4])
-						fmt.Printf("Got ack from %d for %d\n", index, slot)
+						fmt.Printf("\nGot ack from %d for %d\n", index, slot)
 						//go func() {
 						node.Log.Lock.Lock()
 						entry, exists := node.Log.Entries[slot]
