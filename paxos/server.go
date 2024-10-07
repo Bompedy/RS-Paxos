@@ -80,6 +80,7 @@ func (node *Node) Connect(
 			}
 
 			//node.Clients = append(node.Clients, client)
+			fmt.Printf("Appending: %d\n", i)
 			node.Clients[i] = client
 		}()
 	}
