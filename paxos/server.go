@@ -215,12 +215,12 @@ func (node *Node) Accept(
 							//println("Finished forwarding write from leader!")
 						}()
 					} else if op == OpAck {
-						fmt.Printf("Got ack from %d\n", index)
 						err = reader.Read(buffer[:4])
 						if err != nil {
 							panic(err)
 						}
 						slot := binary.LittleEndian.Uint32(buffer[:4])
+						fmt.Printf("Got ack from %d for %d\n", index, slot)
 						//go func() {
 						node.Log.Lock.Lock()
 						entry, exists := node.Log.Entries[slot]
