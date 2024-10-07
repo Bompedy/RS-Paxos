@@ -166,18 +166,19 @@ func (node *Node) Accept(
 						//fmt.Printf("Placed entry into slot: %d\n", slot)
 						//node.Log.Lock.Unlock()
 
+						entry := &Entry{
+							key:       key,
+							value:     value,
+							acked:     1,
+							majority:  uint32(node.Quorum),
+							condition: make(chan struct{}),
+						}
+						node.Log.Lock.Lock()
+						node.Log.Entries[slot] = entry
+						fmt.Printf("Placed entry into slot: %d\n", slot)
+						node.Log.Lock.Unlock()
+
 						go func() {
-							entry := &Entry{
-								key:       key,
-								value:     value,
-								acked:     1,
-								majority:  uint32(node.Quorum),
-								condition: make(chan struct{}),
-							}
-							node.Log.Lock.Lock()
-							node.Log.Entries[slot] = entry
-							fmt.Printf("Placed entry into slot: %d\n", slot)
-							node.Log.Lock.Unlock()
 
 							//etcdWrite(key, value)
 							response := make([]byte, 5)
@@ -309,9 +310,7 @@ func (node *Node) Accept(
 								node.Log.Lock.Unlock()
 
 								if !exists {
-									i -= 1
-									fmt.Printf("%d didnt exist, setting it to %d\n", i, i-1)
-									break
+									panic("major problem")
 								}
 
 								etcdWrite(entry.key, entry.value)
