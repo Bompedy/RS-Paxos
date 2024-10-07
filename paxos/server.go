@@ -284,6 +284,7 @@ func (node *Node) Accept(
 							current := atomic.LoadUint32(&CommitIndex)
 							for {
 								i := current + 1
+								fmt.Printf("Looping %d up to %d", i, next)
 								if i > next {
 									break
 								}
