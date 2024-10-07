@@ -227,7 +227,9 @@ func (node *Node) Accept(
 
 									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
 										etcdWrite(nextEntry.key, nextEntry.value)
-										close(nextEntry.condition)
+										if nextEntry.condition != nil {
+											close(nextEntry.condition)
+										}
 										node.Log.Lock.Lock()
 										delete(node.Log.Entries, i)
 										node.Log.Lock.Unlock()
@@ -291,10 +293,15 @@ func (node *Node) Accept(
 								}
 
 								etcdWrite(entry.key, entry.value)
-								close(entry.condition)
+								if entry.condition != nil {
+									close(entry.condition)
+								}
 
 								node.RequestLock.Lock()
-								close(node.RequestWaiter[string(entry.key)])
+								channel := node.RequestWaiter[string(entry.key)]
+								if channel != nil {
+									close(channel)
+								}
 								node.RequestLock.Unlock()
 							}
 
