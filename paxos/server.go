@@ -246,7 +246,7 @@ func (node *Node) Accept(
 										fmt.Printf("It does not exist for %d\n", next)
 										break
 									}
-									fmt.Printf("Exists for %d\n", next)
+									fmt.Printf("Exists for node=%d slot=%d next=%d\n", index, slot, next)
 									nextEntry.lock.Lock()
 									nextMajority := nextEntry.acked >= nextEntry.majority
 									nextEntry.lock.Unlock()
