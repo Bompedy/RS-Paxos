@@ -243,7 +243,7 @@ func (node *Node) Accept(
 									nextEntry, nextEntryExists := node.Log.Entries[next]
 									node.Log.Lock.Unlock()
 									if !nextEntryExists {
-										fmt.Printf("It does not exist for %d\n", next)
+										fmt.Printf("Does not exist for node=%d slot=%d next=%d\n", index, slot, next)
 										break
 									}
 									fmt.Printf("Exists for node=%d slot=%d next=%d\n", index, slot, next)
@@ -251,7 +251,7 @@ func (node *Node) Accept(
 									nextMajority := nextEntry.acked >= nextEntry.majority
 									nextEntry.lock.Unlock()
 									if nextMajority {
-										fmt.Printf("Got next majority\n")
+										fmt.Printf("Got next majority for node=%d slot=%d next=%d\n", index, slot, next)
 										CommitIndex = next
 										if nextEntry.condition != nil {
 											fmt.Printf("Closing entry condition in ack\n")
@@ -261,13 +261,13 @@ func (node *Node) Accept(
 										delete(node.Log.Entries, next)
 										node.Log.Lock.Unlock()
 									} else {
-										fmt.Printf("Didn't get majority breaking\n")
+										fmt.Printf("Didn't get majority for node=%d slot=%d next=%d\n", index, slot, next)
 										break
 									}
 
 								}
 								if start == CommitIndex {
-									fmt.Printf("Start is same as commit unlocking\n")
+									fmt.Printf("Start is the same for node=%d slot=%d start=%d commitIndex=%d\n", index, slot, start, CommitIndex)
 									CommitLock.Unlock()
 									return
 								}
@@ -275,7 +275,7 @@ func (node *Node) Accept(
 								commitBuffer := make([]byte, 5)
 								commitBuffer[0] = OpCommit
 								binary.LittleEndian.PutUint32(commitBuffer[1:5], CommitIndex)
-								fmt.Printf("Committing up to %d\n", CommitIndex)
+								fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
 								for i := 0; i < node.Total; i++ {
 									if i == node.Index {
 										continue
@@ -291,8 +291,7 @@ func (node *Node) Accept(
 									//}(i, node.Clients[i])
 								}
 
-								fmt.Printf("Finished writing up to %d\n", CommitIndex)
-
+								fmt.Printf("Finished writing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
 								CommitLock.Unlock()
 							}
 						}
