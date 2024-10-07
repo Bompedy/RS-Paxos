@@ -292,76 +292,6 @@ func (node *Node) Accept(
 								CommitLock.Unlock()
 							}
 						}
-
-						//
-						//if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
-						//	fmt.Printf("We have majority on slot: %d\n", slot)
-						//	next := atomic.LoadUint32(&CommitIndex) + 1
-						//	start := next
-						//	for {
-						//		current := atomic.LoadUint32(&CommitIndex)
-						//		node.Log.Lock.Lock()
-						//		nextEntry, nextEntryExists := node.Log.Entries[next]
-						//		node.Log.Lock.Unlock()
-						//
-						//		if !nextEntryExists {
-						//			fmt.Printf("It does not exist for %d\n", next)
-						//			break
-						//		}
-						//
-						//		fmt.Printf("Exists for %d\n", next)
-						//
-						//		if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
-						//			if !atomic.CompareAndSwapUint32(&CommitIndex, current, next) {
-						//				break
-						//			}
-						//			fmt.Printf("Had enough entries %d\n", next)
-						//			//etcdWrite(nextEntry.key, nextEntry.value)
-						//			fmt.Printf("Wrote it to etcd %d\n", next)
-						//			if nextEntry.condition != nil {
-						//				fmt.Printf("Closing entry condition in ack\n")
-						//				close(nextEntry.condition)
-						//			}
-						//			node.Log.Lock.Lock()
-						//			delete(node.Log.Entries, next)
-						//			node.Log.Lock.Unlock()
-						//			next += 1
-						//		} else {
-						//			fmt.Printf("Breaking not enough\n")
-						//			break
-						//		}
-						//	}
-						//
-						//	if start == next {
-						//		println("No changes returning")
-						//		return
-						//	}
-						//
-						//	//for next > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, next) {
-						//	//	current = atomic.LoadUint32(&CommitIndex)
-						//	//}
-						//
-						//	commitBuffer := make([]byte, 5)
-						//	commitBuffer[0] = OpCommit
-						//	binary.LittleEndian.PutUint32(commitBuffer[1:5], next-1)
-						//	fmt.Printf("Committing up to %d\n", next-1)
-						//	for i := 0; i < node.Total; i++ {
-						//		if i == node.Index {
-						//			continue
-						//		}
-						//		client := node.Clients[i]
-						//		//go func(index int, client Client) {
-						//		client.mutex.Lock()
-						//		err := client.Write(commitBuffer)
-						//		if err != nil {
-						//			panic("error writing!")
-						//			return
-						//		}
-						//		client.mutex.Unlock()
-						//		//}(i, node.Clients[i])
-						//	}
-						//}
-						//}()
 					} else if op == OpCommit {
 						//println("Got commit")
 						commitBuffer := make([]byte, 4)
@@ -375,7 +305,9 @@ func (node *Node) Accept(
 
 						go func() {
 							for {
+								fmt.Printf("Trying commit lock")
 								CommitLock.Lock()
+								fmt.Printf("Inside commit loop")
 								current := CommitIndex + 1
 								//fmt.Printf("Looping %d up to %d\n", current, next)
 								if current > next {
