@@ -115,13 +115,12 @@ func (node *Node) Accept(
 				buffer := make([]byte, 65535)
 				for {
 					fmt.Printf("Waiting for op: %d\n", index)
-					println("Got OP: ")
 					err := reader.Read(buffer[:1])
 					if err != nil {
 						panic(err)
 					}
 					op := buffer[0]
-					fmt.Printf("Got op: %d %d\n", index, op)
+					//fmt.Printf("Got op: %d %d\n", index, op)
 					if op == OpPropose {
 						println("Got proposal")
 						err := reader.Read(buffer[:12])
@@ -146,7 +145,6 @@ func (node *Node) Accept(
 						value := make([]byte, valueSize)
 						copy(key, buffer[:keySize])
 						copy(value, buffer[keySize:(keySize+valueSize)])
-						println("Gonna ack back!")
 
 						go func() {
 							entry := &Entry{
@@ -171,7 +169,7 @@ func (node *Node) Accept(
 							if err != nil {
 								panic(err)
 							}
-							println("Acked back")
+							//println("Acked back")
 						}()
 					} else if op == OpForward {
 						println("Got forward")
