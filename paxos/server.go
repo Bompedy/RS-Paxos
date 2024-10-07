@@ -332,9 +332,11 @@ func (node *Node) Accept(
 								node.RequestLock.Unlock()
 							}
 
-							for i > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, next) {
+							for i > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, i) {
 								current = atomic.LoadUint32(&CommitIndex)
 							}
+
+							fmt.Printf("We commited up to %d\n", i)
 						}()
 
 					}
