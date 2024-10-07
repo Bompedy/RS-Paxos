@@ -110,7 +110,7 @@ func (node *Node) Accept(
 	address string,
 	block func(key []byte, value []byte),
 ) error {
-
+	println("dev debug")
 	go func() {
 		for {
 			task, ok := <-taskQueue
