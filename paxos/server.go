@@ -130,7 +130,7 @@ func (node *Node) Accept(
 						panic(err)
 					}
 					op := buffer[0]
-					fmt.Printf("Got op: %d %d\n", index, op)
+					//fmt.Printf("Got op: %d %d\n", index, op)
 					if op == OpPropose {
 						//fmt.Printf("Got proposal from: %d\n", index)
 						err := reader.Read(buffer[:12])
@@ -295,7 +295,7 @@ func (node *Node) Accept(
 								//	//}(i, node.Clients[i])
 								//}
 
-								fmt.Printf("Finished writing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
+								//fmt.Printf("Finished writing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
 								CommitLock.Unlock()
 							}
 						}
