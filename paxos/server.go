@@ -378,10 +378,10 @@ func (node *Node) Forward(
 		node.RequestLock.Lock()
 		node.RequestWaiter[string(key)] = channel
 		node.RequestLock.Unlock()
-		println("Forwarded to leader!")
+		//println("Forwarded to leader!")
 		<-channel
 	} else {
-		println("Leader got request!")
+		//println("Leader got request!")
 		node.Write(key, value, true)
 	}
 }
@@ -455,5 +455,5 @@ func (node *Node) Write(
 	if wait {
 		<-entry.condition
 	}
-	println("passed condition!")
+	//println("passed condition!")
 }
