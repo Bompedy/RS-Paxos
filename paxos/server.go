@@ -295,24 +295,31 @@ func (node *Node) Accept(
 						fmt.Printf("Going to commit up to %d\n", next)
 
 						go func() {
-							current := atomic.LoadUint32(&CommitIndex)
-							i := current
 							for {
-								i += 1
-								fmt.Printf("Looping %d up to %d\n", i, next)
-								if i > next {
-									fmt.Printf("")
+								current := atomic.LoadUint32(&CommitIndex) + 1
+								fmt.Printf("Looping %d up to %d\n", current, next)
+								if current > next {
+									fmt.Printf("Too big\n")
 									break
 								}
+								//
 
 								node.Log.Lock.Lock()
-								fmt.Printf("Looking for log entry %d\n", i)
-								entry, exists := node.Log.Entries[i]
-								delete(node.Log.Entries, i)
+								fmt.Printf("Looking for log entry %d\n", current)
+								entry, exists := node.Log.Entries[current]
+								delete(node.Log.Entries, current)
 								node.Log.Lock.Unlock()
 
+								//for i > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, i) {
+								//	current = atomic.LoadUint32(&CommitIndex)
+								//}
+
+								if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
+									continue
+								}
+
 								if !exists {
-									fmt.Printf("Couldn't find entry %d\n", i)
+									fmt.Printf("Couldn't find entry %d\n", current)
 									panic("major problem")
 								}
 
@@ -332,16 +339,8 @@ func (node *Node) Accept(
 								delete(node.RequestWaiter, keyString)
 								node.RequestLock.Unlock()
 
-								fmt.Printf("i=%d vs current=%d", i, current)
-
-								for i > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, i) {
-									current = atomic.LoadUint32(&CommitIndex)
-								}
+								//fmt.Printf("i=%d vs current=%d\n", i, current)
 							}
-							//
-							//for i > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, i) {
-							//	current = atomic.LoadUint32(&CommitIndex)
-							//}
 
 							fmt.Printf("We commited up to %d\n", atomic.LoadUint32(&CommitIndex))
 						}()
