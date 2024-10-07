@@ -377,6 +377,10 @@ func (node *Node) Forward(
 		leader.mutex.Unlock()
 		channel := make(chan struct{})
 		node.RequestLock.Lock()
+		_, exists := node.RequestWaiter[string(key)]
+		if exists {
+			println("IT ALREADY EXISTS IN THERE AND WE ARE OVERWRITING IT")
+		}
 		node.RequestWaiter[string(key)] = channel
 		node.RequestLock.Unlock()
 		//println("Forwarded to leader!")
