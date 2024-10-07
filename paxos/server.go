@@ -225,6 +225,7 @@ func (node *Node) Accept(
 						slot := binary.LittleEndian.Uint32(buffer[:4])
 						fmt.Printf("\nGot ack from %d for %d\n", index, slot)
 						//go func() {
+						CommitLock.Lock()
 						node.Log.Lock.Lock()
 						entry, exists := node.Log.Entries[slot]
 						node.Log.Lock.Unlock()
@@ -239,7 +240,6 @@ func (node *Node) Accept(
 								//	fmt.Printf("Closing entry condition in ack\n")
 								//	close(entry.condition)
 								//}
-								CommitLock.Lock()
 								start := CommitIndex
 								for {
 									next := CommitIndex + 1
@@ -296,9 +296,10 @@ func (node *Node) Accept(
 								//}
 
 								//fmt.Printf("Finished writing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
-								CommitLock.Unlock()
+								//CommitLock.Unlock()
 							}
 						}
+						CommitLock.Unlock()
 					} else if op == OpCommit {
 						//println("Got commit")
 						commitBuffer := make([]byte, 4)
