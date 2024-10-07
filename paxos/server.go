@@ -379,11 +379,11 @@ func (node *Node) Write(
 	node.Log.Lock.Lock()
 	node.Log.Entries[appliedIndex] = entry
 	node.Log.Lock.Unlock()
-	//etcdWrite(key, value)
-	fmt.Printf("Total clients: %d%n", len(node.Clients))
 
 	for i := 0; i < node.Total; i++ {
+		fmt.Printf("Writing to index: %d\n", i)
 		if i == node.Index {
+			println("Skipping")
 			continue
 		}
 		go func(index int, client Client) {
