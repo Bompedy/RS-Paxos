@@ -255,7 +255,7 @@ func (node *Node) Accept(
 									}
 									go func(index int, client Client) {
 										client.mutex.Lock()
-										err := client.Write(buffer)
+										err := client.Write(commitBuffer)
 										if err != nil {
 											panic("error writing!")
 											return
