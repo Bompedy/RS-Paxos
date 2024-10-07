@@ -105,12 +105,14 @@ func (node *Node) Accept(
 				buffer := make([]byte, 65535)
 				mutex := sync.Mutex{}
 				for {
+					println("Got OP")
 					err := client.Read(buffer[:1])
 					if err != nil {
 						panic(err)
 					}
 					op := buffer[0]
 					if op == OpPropose {
+						println("Got proposal")
 						err := client.Read(buffer[:12])
 						if err != nil {
 							panic(err)
@@ -158,6 +160,7 @@ func (node *Node) Accept(
 							}
 						}()
 					} else if op == OpForward {
+						println("Got forward")
 						err := client.Read(buffer[:8])
 						if err != nil {
 							panic(err)
@@ -177,6 +180,7 @@ func (node *Node) Accept(
 							node.Write(key, value, false)
 						}()
 					} else if op == OpAck {
+						println("Got ack")
 						err = client.Read(buffer)
 						if err != nil {
 							panic(err)
@@ -235,6 +239,7 @@ func (node *Node) Accept(
 							}
 						}()
 					} else if op == OpCommit {
+						println("Got commit")
 						commitBuffer := make([]byte, 4)
 						err = client.Read(commitBuffer)
 						if err != nil {
