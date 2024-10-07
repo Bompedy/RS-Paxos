@@ -153,6 +153,18 @@ func (node *Node) Accept(
 						value := make([]byte, valueSize)
 						copy(key, buffer[:keySize])
 						copy(value, buffer[keySize:(keySize+valueSize)])
+						//
+						//entry := &Entry{
+						//	key:       key,
+						//	value:     value,
+						//	acked:     1,
+						//	majority:  uint32(node.Quorum),
+						//	condition: make(chan struct{}),
+						//}
+						//node.Log.Lock.Lock()
+						//node.Log.Entries[slot] = entry
+						//fmt.Printf("Placed entry into slot: %d\n", slot)
+						//node.Log.Lock.Unlock()
 
 						go func() {
 							entry := &Entry{
@@ -296,7 +308,11 @@ func (node *Node) Accept(
 								node.Log.Lock.Unlock()
 
 								if !exists {
-									panic("Couldn't find it in log!")
+									fmt.Printf("%d didnt exist, setting it to %d", i, i-1)
+									for i-1 > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, i-1) {
+										current = atomic.LoadUint32(&CommitIndex)
+									}
+									break
 								}
 
 								etcdWrite(entry.key, entry.value)
