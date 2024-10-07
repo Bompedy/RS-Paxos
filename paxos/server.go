@@ -134,9 +134,7 @@ func (node *Node) Accept(
 						panic(err)
 					}
 					op := buffer[0]
-					//fmt.Printf("Got op: %d %d\n", index, op)
 					if op == OpPropose {
-						//fmt.Printf("Got proposal from: %d\n", index)
 						err := reader.Read(buffer[:12])
 						if err != nil {
 							panic(err)
@@ -160,18 +158,6 @@ func (node *Node) Accept(
 						value := make([]byte, valueSize)
 						copy(key, buffer[:keySize])
 						copy(value, buffer[keySize:(keySize+valueSize)])
-						//
-						//entry := &Entry{
-						//	key:       key,
-						//	value:     value,
-						//	acked:     1,
-						//	majority:  uint32(node.Quorum),
-						//	condition: make(chan struct{}),
-						//}
-						//node.Log.Lock.Lock()
-						//node.Log.Entries[slot] = entry
-						//fmt.Printf("Placed entry into slot: %d\n", slot)
-						//node.Log.Lock.Unlock()
 
 						entry := &Entry{
 							key:       key,
@@ -183,11 +169,9 @@ func (node *Node) Accept(
 						}
 						node.Log.Lock.Lock()
 						node.Log.Entries[slot] = entry
-						//fmt.Printf("Placed entry into slot: %d\n", slot)
 						node.Log.Lock.Unlock()
 
 						go func() {
-							//etcdWrite(key, value)
 							response := make([]byte, 5)
 							response[0] = OpAck
 							binary.LittleEndian.PutUint32(response[1:], slot)
@@ -199,10 +183,9 @@ func (node *Node) Accept(
 								panic(err)
 							}
 							fmt.Printf("Acked back for node=%d slot=%d\n", index, slot)
-							//fmt.Printf("Acked back to: %d\n", index)
 						}()
 					} else if op == OpForward {
-						//fmt.Printf("Got forward from: %d\n", index)
+						fmt.Printf("Got forward from: %d\n", index)
 						err := reader.Read(buffer[:8])
 						if err != nil {
 							panic(err)
@@ -325,13 +308,10 @@ func (node *Node) Accept(
 								}
 								//
 
-								fmt.Printf("1")
 								node.Log.Lock.Lock()
-								//fmt.Printf("Looking for log entry %d\n", current)
 								entry, exists := node.Log.Entries[current]
 								delete(node.Log.Entries, current)
 								node.Log.Lock.Unlock()
-								fmt.Printf("2")
 								//
 								//if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
 								//	continue
@@ -339,29 +319,22 @@ func (node *Node) Accept(
 								CommitIndex = current
 
 								if !exists {
-									//fmt.Printf("Couldn't find entry %d\n", current)
 									panic("major problem")
 								}
 
 								etcdWrite(entry.key, entry.value)
 								if entry.condition != nil {
-									//fmt.Printf("Closing condition in commit\n")
 									close(entry.condition)
 								}
 
-								fmt.Printf("3")
 								node.RequestLock.Lock()
 								keyString := string(entry.key)
 								channel := node.RequestWaiter[keyString]
 								if channel != nil {
-									//fmt.Printf("Closing request in commit\n")
 									close(channel)
 								}
 								delete(node.RequestWaiter, keyString)
 								node.RequestLock.Unlock()
-								fmt.Printf("4")
-
-								//fmt.Printf("i=%d vs current=%d\n", i, current)
 							}
 
 							fmt.Printf("Unlocking follower lock\n")
