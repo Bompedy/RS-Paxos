@@ -169,10 +169,10 @@ func (node *Node) Accept(
 							if err != nil {
 								panic(err)
 							}
-							//println("Acked back")
+							fmt.Printf("Acked back to: %d\n", index)
 						}()
 					} else if op == OpForward {
-						println("Got forward")
+						fmt.Printf("Got forward from: %d\n", index)
 						err := reader.Read(buffer[:8])
 						if err != nil {
 							panic(err)
