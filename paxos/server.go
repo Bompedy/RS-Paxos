@@ -322,11 +322,13 @@ func (node *Node) Accept(
 								}
 
 								node.RequestLock.Lock()
-								channel := node.RequestWaiter[string(entry.key)]
+								keyString := string(entry.key)
+								channel := node.RequestWaiter[keyString]
 								if channel != nil {
 									fmt.Printf("Closing request in commit\n")
 									close(channel)
 								}
+								delete(node.RequestWaiter, keyString)
 								node.RequestLock.Unlock()
 							}
 
