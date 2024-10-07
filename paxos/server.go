@@ -215,7 +215,6 @@ func (node *Node) Accept(
 						copy(value, buffer[keySize:(keySize+valueSize)])
 						go func() {
 							node.Write(key, value, false)
-							println("Finished forwarding write from leader!")
 						}()
 					} else if op == OpAck {
 						err = reader.Read(buffer[:4])
@@ -306,63 +305,63 @@ func (node *Node) Accept(
 						next := binary.LittleEndian.Uint32(commitBuffer[:4])
 						//fmt.Printf("Going to commit up to %d\n", next)
 
-						go func() {
-							fmt.Printf("Trying commit lock\n")
-							CommitLock.Lock()
-							for {
-								fmt.Printf("Inside commit loop\n")
-								current := CommitIndex + 1
-								//fmt.Printf("Looping %d up to %d\n", current, next)
-								if current > next {
-									fmt.Printf("Too big\n")
-									break
-								}
-								//
+						//go func() {
+						fmt.Printf("Trying commit lock\n")
+						CommitLock.Lock()
+						for {
+							fmt.Printf("Inside commit loop\n")
+							current := CommitIndex + 1
+							//fmt.Printf("Looping %d up to %d\n", current, next)
+							if current > next {
+								fmt.Printf("Too big\n")
+								break
+							}
+							//
 
-								fmt.Printf("1")
-								node.Log.Lock.Lock()
-								//fmt.Printf("Looking for log entry %d\n", current)
-								entry, exists := node.Log.Entries[current]
-								delete(node.Log.Entries, current)
-								node.Log.Lock.Unlock()
-								fmt.Printf("2")
-								//
-								//if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
-								//	continue
-								//}
-								CommitIndex = current
+							fmt.Printf("1")
+							node.Log.Lock.Lock()
+							//fmt.Printf("Looking for log entry %d\n", current)
+							entry, exists := node.Log.Entries[current]
+							delete(node.Log.Entries, current)
+							node.Log.Lock.Unlock()
+							fmt.Printf("2")
+							//
+							//if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
+							//	continue
+							//}
+							CommitIndex = current
 
-								if !exists {
-									//fmt.Printf("Couldn't find entry %d\n", current)
-									panic("major problem")
-								}
-
-								//etcdWrite(entry.key, entry.value)
-								if entry.condition != nil {
-									//fmt.Printf("Closing condition in commit\n")
-									close(entry.condition)
-								}
-
-								fmt.Printf("3")
-								node.RequestLock.Lock()
-								keyString := string(entry.key)
-								channel := node.RequestWaiter[keyString]
-								if channel != nil {
-									//fmt.Printf("Closing request in commit\n")
-									close(channel)
-								}
-								delete(node.RequestWaiter, keyString)
-								node.RequestLock.Unlock()
-								fmt.Printf("4")
-
-								//fmt.Printf("i=%d vs current=%d\n", i, current)
+							if !exists {
+								//fmt.Printf("Couldn't find entry %d\n", current)
+								panic("major problem")
 							}
 
-							fmt.Printf("Unlocking follower lock\n")
-							CommitLock.Unlock()
+							//etcdWrite(entry.key, entry.value)
+							if entry.condition != nil {
+								//fmt.Printf("Closing condition in commit\n")
+								close(entry.condition)
+							}
 
-							fmt.Printf("We commited up to %d\n", atomic.LoadUint32(&CommitIndex))
-						}()
+							fmt.Printf("3")
+							node.RequestLock.Lock()
+							keyString := string(entry.key)
+							channel := node.RequestWaiter[keyString]
+							if channel != nil {
+								//fmt.Printf("Closing request in commit\n")
+								close(channel)
+							}
+							delete(node.RequestWaiter, keyString)
+							node.RequestLock.Unlock()
+							fmt.Printf("4")
+
+							//fmt.Printf("i=%d vs current=%d\n", i, current)
+						}
+
+						fmt.Printf("Unlocking follower lock\n")
+						CommitLock.Unlock()
+
+						fmt.Printf("We commited up to %d\n", atomic.LoadUint32(&CommitIndex))
+						//}()
 
 					}
 				}
