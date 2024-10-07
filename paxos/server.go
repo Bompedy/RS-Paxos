@@ -267,6 +267,7 @@ func (node *Node) Accept(
 
 								}
 								if start == CommitIndex {
+									fmt.Printf("Start is same as commit unlocking")
 									CommitLock.Unlock()
 									return
 								}
