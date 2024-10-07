@@ -235,51 +235,51 @@ func (node *Node) Accept(
 							majority := entry.acked == entry.majority
 							entry.lock.Unlock()
 							if majority {
-								if entry.condition != nil {
-									fmt.Printf("Closing entry condition in ack\n")
-									close(entry.condition)
+								//if entry.condition != nil {
+								//	fmt.Printf("Closing entry condition in ack\n")
+								//	close(entry.condition)
+								//}
+								CommitLock.Lock()
+								start := CommitIndex
+								for {
+									next := CommitIndex + 1
+									node.Log.Lock.Lock()
+									nextEntry, nextEntryExists := node.Log.Entries[next]
+									node.Log.Lock.Unlock()
+									if !nextEntryExists {
+										fmt.Printf("Does not exist for node=%d slot=%d next=%d\n", index, slot, next)
+										break
+									}
+									fmt.Printf("Exists for node=%d slot=%d next=%d\n", index, slot, next)
+									nextEntry.lock.Lock()
+									nextMajority := nextEntry.acked >= nextEntry.majority
+									nextEntry.lock.Unlock()
+									if nextMajority {
+										fmt.Printf("Got next majority for node=%d slot=%d next=%d\n", index, slot, next)
+										CommitIndex = next
+										if nextEntry.condition != nil {
+											fmt.Printf("Closing entry condition in ack\n")
+											close(nextEntry.condition)
+										}
+										node.Log.Lock.Lock()
+										delete(node.Log.Entries, next)
+										node.Log.Lock.Unlock()
+									} else {
+										fmt.Printf("Didn't get majority for node=%d slot=%d next=%d\n", index, slot, next)
+										break
+									}
+
 								}
-								//CommitLock.Lock()
-								//start := CommitIndex
-								//for {
-								//	next := CommitIndex + 1
-								//	node.Log.Lock.Lock()
-								//	nextEntry, nextEntryExists := node.Log.Entries[next]
-								//	node.Log.Lock.Unlock()
-								//	if !nextEntryExists {
-								//		fmt.Printf("Does not exist for node=%d slot=%d next=%d\n", index, slot, next)
-								//		break
-								//	}
-								//	fmt.Printf("Exists for node=%d slot=%d next=%d\n", index, slot, next)
-								//	nextEntry.lock.Lock()
-								//	nextMajority := nextEntry.acked >= nextEntry.majority
-								//	nextEntry.lock.Unlock()
-								//	if nextMajority {
-								//		fmt.Printf("Got next majority for node=%d slot=%d next=%d\n", index, slot, next)
-								//		CommitIndex = next
-								//		if nextEntry.condition != nil {
-								//			fmt.Printf("Closing entry condition in ack\n")
-								//			close(nextEntry.condition)
-								//		}
-								//		node.Log.Lock.Lock()
-								//		delete(node.Log.Entries, next)
-								//		node.Log.Lock.Unlock()
-								//	} else {
-								//		fmt.Printf("Didn't get majority for node=%d slot=%d next=%d\n", index, slot, next)
-								//		break
-								//	}
-								//
-								//}
-								//if start == CommitIndex {
-								//	fmt.Printf("Start is the same for node=%d slot=%d start=%d commitIndex=%d\n", index, slot, start, CommitIndex)
-								//	CommitLock.Unlock()
-								//	return
-								//}
+								if start == CommitIndex {
+									fmt.Printf("Start is the same for node=%d slot=%d start=%d commitIndex=%d\n", index, slot, start, CommitIndex)
+									CommitLock.Unlock()
+									return
+								}
 								//
 								//commitBuffer := make([]byte, 5)
 								//commitBuffer[0] = OpCommit
 								//binary.LittleEndian.PutUint32(commitBuffer[1:5], CommitIndex)
-								//fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
+								fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
 								//for i := 0; i < node.Total; i++ {
 								//	if i == node.Index {
 								//		continue
@@ -296,7 +296,7 @@ func (node *Node) Accept(
 								//}
 
 								fmt.Printf("Finished writing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
-								//CommitLock.Unlock()
+								CommitLock.Unlock()
 							}
 						}
 					} else if op == OpCommit {
