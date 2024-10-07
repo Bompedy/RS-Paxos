@@ -247,7 +247,7 @@ func (node *Node) Accept(
 
 								if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
 									fmt.Printf("Had enough entries %d\n", i)
-									etcdWrite(nextEntry.key, nextEntry.value)
+									//etcdWrite(nextEntry.key, nextEntry.value)
 									fmt.Printf("Wrote it to etcd %d\n", i)
 									if nextEntry.condition != nil {
 										fmt.Printf("Closing entry condition in ack\n")
