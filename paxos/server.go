@@ -259,13 +259,13 @@ func (node *Node) Accept(
 									}
 									if start == CommitIndex {
 										fmt.Printf("Start is the same for node=%d slot=%d start=%d commitIndex=%d\n", index, slot, start, CommitIndex)
-										CommitLock.Unlock()
+										//CommitLock.Unlock()
 									} else {
 										fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
 										commitBuffer := make([]byte, 5)
 										commitBuffer[0] = OpCommit
 										binary.LittleEndian.PutUint32(commitBuffer[1:5], CommitIndex)
-										CommitLock.Unlock()
+										//CommitLock.Unlock()
 
 										fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
 										for i := 0; i < node.Total; i++ {
@@ -282,6 +282,7 @@ func (node *Node) Accept(
 											}(i, node.Clients[i])
 										}
 									}
+									CommitLock.Unlock()
 								}
 							}
 						}()
