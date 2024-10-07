@@ -309,10 +309,8 @@ func (node *Node) Accept(
 								node.Log.Lock.Unlock()
 
 								if !exists {
+									i -= 1
 									fmt.Printf("%d didnt exist, setting it to %d", i, i-1)
-									for i-1 > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, i-1) {
-										current = atomic.LoadUint32(&CommitIndex)
-									}
 									break
 								}
 
@@ -329,7 +327,7 @@ func (node *Node) Accept(
 								node.RequestLock.Unlock()
 							}
 
-							for next > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, next) {
+							for i > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, next) {
 								current = atomic.LoadUint32(&CommitIndex)
 							}
 						}()
