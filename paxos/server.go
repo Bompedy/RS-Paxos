@@ -245,6 +245,7 @@ func (node *Node) Accept(
 									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
 										etcdWrite(nextEntry.key, nextEntry.value)
 										if nextEntry.condition != nil {
+											fmt.Printf("Closing entry condition in ack\n")
 											close(nextEntry.condition)
 										}
 										node.Log.Lock.Lock()
@@ -316,12 +317,14 @@ func (node *Node) Accept(
 
 								etcdWrite(entry.key, entry.value)
 								if entry.condition != nil {
+									fmt.Printf("Closing condition in commit\n")
 									close(entry.condition)
 								}
 
 								node.RequestLock.Lock()
 								channel := node.RequestWaiter[string(entry.key)]
 								if channel != nil {
+									fmt.Printf("Closing request in commit\n")
 									close(channel)
 								}
 								node.RequestLock.Unlock()
