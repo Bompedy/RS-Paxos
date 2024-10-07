@@ -251,7 +251,7 @@ func (node *Node) Accept(
 									nextMajority := nextEntry.acked >= nextEntry.majority
 									nextEntry.lock.Unlock()
 									if nextMajority {
-										fmt.Printf("Got next majority")
+										fmt.Printf("Got next majority\n")
 										CommitIndex = next
 										if nextEntry.condition != nil {
 											fmt.Printf("Closing entry condition in ack\n")
