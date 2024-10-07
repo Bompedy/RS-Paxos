@@ -271,15 +271,16 @@ func (node *Node) Accept(
 								if i == node.Index {
 									continue
 								}
-								go func(index int, client Client) {
-									client.mutex.Lock()
-									err := client.Write(commitBuffer)
-									if err != nil {
-										panic("error writing!")
-										return
-									}
-									client.mutex.Unlock()
-								}(i, node.Clients[i])
+								client := node.Clients[i]
+								//go func(index int, client Client) {
+								client.mutex.Lock()
+								err := client.Write(commitBuffer)
+								if err != nil {
+									panic("error writing!")
+									return
+								}
+								client.mutex.Unlock()
+								//}(i, node.Clients[i])
 							}
 						}
 						//}()
