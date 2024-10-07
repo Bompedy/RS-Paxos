@@ -221,68 +221,68 @@ func (node *Node) Accept(
 							panic(err)
 						}
 						slot := binary.LittleEndian.Uint32(buffer[:4])
-						go func() {
-							node.Log.Lock.Lock()
-							entry, exists := node.Log.Entries[slot]
-							node.Log.Lock.Unlock()
+						//go func() {
+						node.Log.Lock.Lock()
+						entry, exists := node.Log.Entries[slot]
+						node.Log.Lock.Unlock()
 
-							if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
-								current := atomic.LoadUint32(&CommitIndex)
-								next := current
-								for {
-									var i = next + 1
+						if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
+							current := atomic.LoadUint32(&CommitIndex)
+							next := current
+							for {
+								var i = next + 1
+								node.Log.Lock.Lock()
+								nextEntry, nextEntryExists := node.Log.Entries[i]
+								node.Log.Lock.Unlock()
+
+								if !nextEntryExists {
+									fmt.Printf("It does not exist for %d\n", i)
+									break
+								}
+
+								fmt.Printf("Exists for %d\n", i)
+
+								if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
+									etcdWrite(nextEntry.key, nextEntry.value)
+									if nextEntry.condition != nil {
+										fmt.Printf("Closing entry condition in ack\n")
+										close(nextEntry.condition)
+									}
 									node.Log.Lock.Lock()
-									nextEntry, nextEntryExists := node.Log.Entries[i]
+									delete(node.Log.Entries, i)
 									node.Log.Lock.Unlock()
-
-									if !nextEntryExists {
-										fmt.Printf("It does not exist for %d\n", i)
-										break
-									}
-
-									fmt.Printf("Exists for %d\n", i)
-
-									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
-										etcdWrite(nextEntry.key, nextEntry.value)
-										if nextEntry.condition != nil {
-											fmt.Printf("Closing entry condition in ack\n")
-											close(nextEntry.condition)
-										}
-										node.Log.Lock.Lock()
-										delete(node.Log.Entries, i)
-										node.Log.Lock.Unlock()
-										next = i
-									}
-								}
-
-								if next == current {
-									return
-								}
-
-								for next > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, next) {
-									current = atomic.LoadUint32(&CommitIndex)
-								}
-
-								commitBuffer := make([]byte, 5)
-								commitBuffer[0] = OpCommit
-								binary.LittleEndian.PutUint32(commitBuffer[1:5], next)
-								fmt.Printf("Committing up to %d\n", next)
-								for i := 0; i < node.Total; i++ {
-									if i == node.Index {
-										continue
-									}
-									go func(index int, client Client) {
-										client.mutex.Lock()
-										err := client.Write(commitBuffer)
-										if err != nil {
-											panic("error writing!")
-											return
-										}
-										client.mutex.Unlock()
-									}(i, node.Clients[i])
+									next = i
 								}
 							}
-						}()
+
+							if next == current {
+								return
+							}
+
+							for next > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, next) {
+								current = atomic.LoadUint32(&CommitIndex)
+							}
+
+							commitBuffer := make([]byte, 5)
+							commitBuffer[0] = OpCommit
+							binary.LittleEndian.PutUint32(commitBuffer[1:5], next)
+							fmt.Printf("Committing up to %d\n", next)
+							for i := 0; i < node.Total; i++ {
+								if i == node.Index {
+									continue
+								}
+								go func(index int, client Client) {
+									client.mutex.Lock()
+									err := client.Write(commitBuffer)
+									if err != nil {
+										panic("error writing!")
+										return
+									}
+									client.mutex.Unlock()
+								}(i, node.Clients[i])
+							}
+						}
+						//}()
 					} else if op == OpCommit {
 						println("Got commit")
 						commitBuffer := make([]byte, 4)
@@ -309,10 +309,6 @@ func (node *Node) Accept(
 								entry, exists := node.Log.Entries[current]
 								delete(node.Log.Entries, current)
 								node.Log.Lock.Unlock()
-
-								//for i > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, i) {
-								//	current = atomic.LoadUint32(&CommitIndex)
-								//}
 
 								if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
 									continue
