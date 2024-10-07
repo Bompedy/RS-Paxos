@@ -114,13 +114,14 @@ func (node *Node) Accept(
 			go func() {
 				buffer := make([]byte, 65535)
 				for {
-					println("Got OP")
+					fmt.Printf("Waiting for op: %d\n", index)
+					println("Got OP: ")
 					err := reader.Read(buffer[:1])
 					if err != nil {
 						panic(err)
 					}
 					op := buffer[0]
-					println("Received OP: %d", op)
+					fmt.Printf("Got op: %d %d\n", index, op)
 					if op == OpPropose {
 						println("Got proposal")
 						err := reader.Read(buffer[:12])
