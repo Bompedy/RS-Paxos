@@ -228,10 +228,7 @@ func (node *Node) Accept(
 
 						if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
 							fmt.Printf("We have majority on slot: %d\n", slot)
-							next := atomic.LoadUint32(&CommitIndex)
-							if next == 0 {
-								next += 1
-							}
+							next := atomic.LoadUint32(&CommitIndex) + 1
 							start := next
 							for {
 								current := atomic.LoadUint32(&CommitIndex)
