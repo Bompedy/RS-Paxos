@@ -122,7 +122,7 @@ func (node *Node) Accept(
 					op := buffer[0]
 					//fmt.Printf("Got op: %d %d\n", index, op)
 					if op == OpPropose {
-						println("Got proposal")
+						fmt.Printf("Got proposal from: %d\n", index)
 						err := reader.Read(buffer[:12])
 						if err != nil {
 							panic(err)
