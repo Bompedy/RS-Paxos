@@ -182,22 +182,21 @@ func (node *Node) Accept(
 						//fmt.Printf("Placed entry into slot: %d\n", slot)
 						node.Log.Lock.Unlock()
 
-						//go func() {
-
-						//etcdWrite(key, value)
-						response := make([]byte, 5)
-						response[0] = OpAck
-						binary.LittleEndian.PutUint32(response[1:], slot)
-						client := node.Clients[index]
-						client.mutex.Lock()
-						err = client.Write(response)
-						client.mutex.Unlock()
-						if err != nil {
-							panic(err)
-						}
-						fmt.Printf("Acked back for node=%d slot=%d\n", index, slot)
-						//fmt.Printf("Acked back to: %d\n", index)
-						//}()
+						go func() {
+							//etcdWrite(key, value)
+							response := make([]byte, 5)
+							response[0] = OpAck
+							binary.LittleEndian.PutUint32(response[1:], slot)
+							client := node.Clients[index]
+							client.mutex.Lock()
+							err = client.Write(response)
+							client.mutex.Unlock()
+							if err != nil {
+								panic(err)
+							}
+							fmt.Printf("Acked back for node=%d slot=%d\n", index, slot)
+							//fmt.Printf("Acked back to: %d\n", index)
+						}()
 					} else if op == OpForward {
 						//fmt.Printf("Got forward from: %d\n", index)
 						err := reader.Read(buffer[:8])
