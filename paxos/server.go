@@ -116,6 +116,7 @@ func (node *Node) Accept(
 				for {
 					fmt.Printf("Waiting for op: %d\n", index)
 					err := reader.Read(buffer[:1])
+					fmt.Printf("Anything: %d\n", index)
 					if err != nil {
 						panic(err)
 					}
