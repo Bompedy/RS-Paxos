@@ -306,9 +306,9 @@ func (node *Node) Accept(
 						//fmt.Printf("Going to commit up to %d\n", next)
 
 						go func() {
+							fmt.Printf("Trying commit lock\n")
+							CommitLock.Lock()
 							for {
-								fmt.Printf("Trying commit lock\n")
-								CommitLock.Lock()
 								fmt.Printf("Inside commit loop\n")
 								current := CommitIndex + 1
 								//fmt.Printf("Looping %d up to %d\n", current, next)
