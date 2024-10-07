@@ -50,12 +50,13 @@ func (node *Node) Connect(
 	nodes []string,
 ) error {
 	var waiter sync.WaitGroup
-	for _, address := range nodes {
+	for i, address := range nodes {
 		if address == local {
 			continue
 		}
 		waiter.Add(1)
 		address := fmt.Sprintf("%s:2000", address)
+		i := i
 		go func() {
 			defer waiter.Done()
 			var connection net.Conn
@@ -77,14 +78,9 @@ func (node *Node) Connect(
 			if err != nil {
 				panic("Error writing index!")
 			}
-			err = client.Read(indexBuffer)
-			if err != nil {
-				panic("Error reading index back!")
-			}
 
-			fmt.Printf("Added %d\n: ", indexBuffer[0])
 			//node.Clients = append(node.Clients, client)
-			node.Clients[indexBuffer[0]] = client
+			node.Clients[i] = client
 		}()
 	}
 
@@ -120,11 +116,6 @@ func (node *Node) Accept(
 				panic("Error reading index!")
 			}
 			index := uint32(indexBuffer[0])
-			indexBuffer[0] = uint8(node.Index)
-			err = node.Clients[index].Write(indexBuffer)
-			if err != nil {
-				panic("Error write back index!")
-			}
 
 			go func() {
 				buffer := make([]byte, 65535)
