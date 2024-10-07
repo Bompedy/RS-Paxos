@@ -259,6 +259,7 @@ func (node *Node) Accept(
 								}
 							}
 
+							fmt.Printf("compared %d vs %d\n", next, current)
 							if next == current {
 								return
 							}
