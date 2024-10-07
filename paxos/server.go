@@ -227,6 +227,7 @@ func (node *Node) Accept(
 						node.Log.Lock.Unlock()
 
 						if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
+							fmt.Printf("We have majority on slot: %d\n", slot)
 							current := atomic.LoadUint32(&CommitIndex)
 							next := current
 							for {
