@@ -301,6 +301,7 @@ func (node *Node) Accept(
 								i += 1
 								fmt.Printf("Looping %d up to %d\n", i, next)
 								if i > next {
+									fmt.Printf("")
 									break
 								}
 
@@ -330,13 +331,17 @@ func (node *Node) Accept(
 								}
 								delete(node.RequestWaiter, keyString)
 								node.RequestLock.Unlock()
-							}
 
-							for i > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, i) {
-								current = atomic.LoadUint32(&CommitIndex)
+								for i > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, i) {
+									current = atomic.LoadUint32(&CommitIndex)
+								}
 							}
+							//
+							//for i > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, i) {
+							//	current = atomic.LoadUint32(&CommitIndex)
+							//}
 
-							fmt.Printf("We commited up to %d\n", i)
+							fmt.Printf("We commited up to %d\n", atomic.LoadUint32(&CommitIndex))
 						}()
 
 					}
