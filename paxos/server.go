@@ -222,6 +222,7 @@ func (node *Node) Accept(
 									node.Log.Lock.Unlock()
 
 									if !nextEntryExists {
+										fmt.Printf("It does not exist for %d\n", i)
 										break
 									}
 
