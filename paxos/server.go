@@ -252,7 +252,6 @@ func (node *Node) Accept(
 											fmt.Printf("Does not exist for node=%d slot=%d next=%d\n", index, slot, next)
 											break
 										}
-										//fmt.Printf("Exists for node=%d slot=%d next=%d\n", index, slot, next)
 
 										nextEntry.lock.Lock()
 										nextMajority := nextEntry.acked >= nextEntry.majority
@@ -261,6 +260,7 @@ func (node *Node) Accept(
 										if nextMajority {
 											fmt.Printf("Got next majority for node=%d slot=%d next=%d\n", index, slot, next)
 											CommitIndex = next
+											etcdWrite(nextEntry.key, nextEntry.value)
 											if nextEntry.condition != nil {
 												fmt.Printf("Closing entry for node=%d slot=%d next=%d\n", index, slot, next)
 												close(nextEntry.condition)
@@ -276,35 +276,31 @@ func (node *Node) Accept(
 									}
 									if start == CommitIndex {
 										fmt.Printf("Start is the same for node=%d slot=%d start=%d commitIndex=%d\n", index, slot, start, CommitIndex)
+										CommitLock.Unlock()
 									} else {
 										fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
-									}
+										commitBuffer := make([]byte, 5)
+										commitBuffer[0] = OpCommit
+										binary.LittleEndian.PutUint32(commitBuffer[1:5], CommitIndex)
+										CommitLock.Unlock()
 
-									commitBuffer := make([]byte, 5)
-									commitBuffer[0] = OpCommit
-									binary.LittleEndian.PutUint32(commitBuffer[1:5], CommitIndex)
-									fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
-									for i := 0; i < node.Total; i++ {
-										if i == node.Index {
-											continue
+										fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
+										for i := 0; i < node.Total; i++ {
+											if i == node.Index {
+												continue
+											}
+											go func(index int, client Client) {
+												client.mutex.Lock()
+												err := client.Write(commitBuffer)
+												if err != nil {
+													panic("error writing!")
+												}
+												client.mutex.Unlock()
+											}(i, node.Clients[i])
 										}
-										client := node.Clients[i]
-										//go func(index int, client Client) {
-										client.mutex.Lock()
-										err := client.Write(commitBuffer)
-										if err != nil {
-											panic("error writing!")
-										}
-										client.mutex.Unlock()
 									}
-									//(i, node.Clients[i])
-									CommitLock.Unlock()
 								}
-
-								//fmt.Printf("Finished writing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
 							}
-
-							//CommitLock.Unlock()
 						}()
 					} else if op == OpCommit {
 						//println("Got commit")
@@ -347,7 +343,7 @@ func (node *Node) Accept(
 									panic("major problem")
 								}
 
-								//etcdWrite(entry.key, entry.value)
+								etcdWrite(entry.key, entry.value)
 								if entry.condition != nil {
 									//fmt.Printf("Closing condition in commit\n")
 									close(entry.condition)
