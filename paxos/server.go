@@ -77,7 +77,8 @@ func (node *Node) Connect(
 			if err != nil {
 				panic("Error writing index!")
 			}
-			node.Clients = append(node.Clients, client)
+			//node.Clients = append(node.Clients, client)
+			node.Clients[node.Index] = client
 		}()
 	}
 
@@ -240,6 +241,10 @@ func (node *Node) Accept(
 								commitBuffer[0] = OpCommit
 								binary.LittleEndian.PutUint32(buffer[1:5], current)
 								for i := range node.Clients {
+									client := node.Clients[i]
+									if client == (Client{}) {
+										continue
+									}
 									go func(index int, client Client) {
 										client.mutex.Lock()
 										err := client.Write(buffer)
@@ -370,8 +375,13 @@ func (node *Node) Write(
 	node.Log.Entries[appliedIndex] = entry
 	node.Log.Lock.Unlock()
 	//etcdWrite(key, value)
+	fmt.Printf("Total clients: %d%n", len(node.Clients))
 
 	for i := range node.Clients {
+		client := node.Clients[i]
+		if client == (Client{}) {
+			continue
+		}
 		go func(index int, client Client) {
 			shard := segments[index+1]
 			//shard := value
