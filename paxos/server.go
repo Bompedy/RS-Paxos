@@ -251,6 +251,7 @@ func (node *Node) Accept(
 									nextMajority := nextEntry.acked >= nextEntry.majority
 									nextEntry.lock.Unlock()
 									if nextMajority {
+										fmt.Printf("Got next majority")
 										CommitIndex = next
 										if nextEntry.condition != nil {
 											fmt.Printf("Closing entry condition in ack\n")
@@ -260,6 +261,7 @@ func (node *Node) Accept(
 										delete(node.Log.Entries, next)
 										node.Log.Lock.Unlock()
 									} else {
+										fmt.Printf("Didn't get majority breaking")
 										break
 									}
 
@@ -283,7 +285,6 @@ func (node *Node) Accept(
 									err := client.Write(commitBuffer)
 									if err != nil {
 										panic("error writing!")
-										return
 									}
 									client.mutex.Unlock()
 									//}(i, node.Clients[i])
