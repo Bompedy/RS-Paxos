@@ -258,7 +258,7 @@ func (node *Node) Accept(
 										fmt.Printf("Got next majority for node=%d slot=%d next=%d\n", index, slot, next)
 										CommitIndex = next
 										if nextEntry.condition != nil {
-											fmt.Printf("Closing entry condition in ack\n")
+											fmt.Printf("Closing entry for node=%d slot=%d next=%d\n", index, slot, next)
 											close(nextEntry.condition)
 										}
 										node.Log.Lock.Lock()
