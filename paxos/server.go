@@ -111,6 +111,7 @@ func (node *Node) Accept(
 						panic(err)
 					}
 					op := buffer[0]
+					println("Received OP: %d", op)
 					if op == OpPropose {
 						println("Got proposal")
 						err := client.Read(buffer[:12])
@@ -180,6 +181,7 @@ func (node *Node) Accept(
 						copy(value, buffer[keySize:(keySize+valueSize)])
 						go func() {
 							node.Write(key, value, false)
+							println("Finished forwarding write from leader!")
 						}()
 					} else if op == OpAck {
 						println("Got ack")
