@@ -278,8 +278,8 @@ func (node *Node) Accept(
 
 							commitBuffer := make([]byte, 5)
 							commitBuffer[0] = OpCommit
-							binary.LittleEndian.PutUint32(commitBuffer[1:5], next)
-							fmt.Printf("Committing up to %d\n", next)
+							binary.LittleEndian.PutUint32(commitBuffer[1:5], next-1)
+							fmt.Printf("Committing up to %d\n", next-1)
 							for i := 0; i < node.Total; i++ {
 								if i == node.Index {
 									continue
