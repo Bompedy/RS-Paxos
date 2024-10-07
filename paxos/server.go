@@ -277,6 +277,7 @@ func (node *Node) Accept(
 						}
 
 						next := binary.LittleEndian.Uint32(commitBuffer[:4])
+						fmt.Printf("Going to commit up to %d\n", next)
 
 						go func() {
 							current := atomic.LoadUint32(&CommitIndex)
