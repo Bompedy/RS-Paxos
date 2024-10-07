@@ -353,6 +353,7 @@ func (node *Node) Accept(
 								//fmt.Printf("i=%d vs current=%d\n", i, current)
 							}
 
+							fmt.Printf("Unlocking follower lock\n")
 							CommitLock.Unlock()
 
 							fmt.Printf("We commited up to %d\n", atomic.LoadUint32(&CommitIndex))
