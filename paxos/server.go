@@ -305,9 +305,9 @@ func (node *Node) Accept(
 
 						go func() {
 							for {
-								fmt.Printf("Trying commit lock")
+								fmt.Printf("Trying commit lock\n")
 								CommitLock.Lock()
-								fmt.Printf("Inside commit loop")
+								fmt.Printf("Inside commit loop\n")
 								current := CommitIndex + 1
 								//fmt.Printf("Looping %d up to %d\n", current, next)
 								if current > next {
@@ -332,7 +332,7 @@ func (node *Node) Accept(
 									panic("major problem")
 								}
 
-								etcdWrite(entry.key, entry.value)
+								//etcdWrite(entry.key, entry.value)
 								if entry.condition != nil {
 									//fmt.Printf("Closing condition in commit\n")
 									close(entry.condition)
