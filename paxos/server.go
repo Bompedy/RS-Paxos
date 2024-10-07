@@ -285,6 +285,7 @@ func (node *Node) Forward(
 	value []byte,
 ) {
 	if node.Index != node.Leader {
+		println("Leader didnt get request forwarding!")
 		buffer := make([]byte, 9+len(key)+len(value))
 		buffer[0] = OpForward
 		binary.LittleEndian.PutUint32(buffer[1:5], uint32(len(key)))
@@ -305,6 +306,7 @@ func (node *Node) Forward(
 		node.RequestLock.Unlock()
 		<-channel
 	} else {
+		println("Leader got request!")
 		node.Write(key, value, true)
 	}
 }
