@@ -93,7 +93,6 @@ func (node *Node) Accept(
 	address string,
 	etcdWrite func(key []byte, value []byte),
 ) error {
-	ack_lock := &sync.Mutex{}
 
 	for {
 		// loop here cause port might be stuck open
@@ -220,7 +219,6 @@ func (node *Node) Accept(
 						if err != nil {
 							panic(err)
 						}
-						ack_lock.Lock()
 						slot := binary.LittleEndian.Uint32(buffer[:4])
 						fmt.Printf("\nGot ack from %d for %d\n", index, slot)
 						//go func() {
@@ -246,6 +244,9 @@ func (node *Node) Accept(
 								fmt.Printf("Exists for %d\n", i)
 
 								if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
+									if !atomic.CompareAndSwapUint32(&CommitIndex, current, next) {
+										break
+									}
 									fmt.Printf("Had enough entries %d\n", i)
 									//etcdWrite(nextEntry.key, nextEntry.value)
 									fmt.Printf("Wrote it to etcd %d\n", i)
@@ -265,13 +266,12 @@ func (node *Node) Accept(
 
 							fmt.Printf("compared %d vs %d\n", next, current)
 							if next == current {
-								ack_lock.Unlock()
 								return
 							}
 
-							for next > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, next) {
-								current = atomic.LoadUint32(&CommitIndex)
-							}
+							//for next > current && !atomic.CompareAndSwapUint32(&CommitIndex, current, next) {
+							//	current = atomic.LoadUint32(&CommitIndex)
+							//}
 
 							commitBuffer := make([]byte, 5)
 							commitBuffer[0] = OpCommit
@@ -293,7 +293,6 @@ func (node *Node) Accept(
 								//}(i, node.Clients[i])
 							}
 						}
-						ack_lock.Unlock()
 						//}()
 					} else if op == OpCommit {
 						//println("Got commit")
