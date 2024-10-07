@@ -151,7 +151,7 @@ func (node *Node) Accept(
 
 							//etcdWrite(key, value)
 							response := make([]byte, 5)
-							buffer[0] = OpAck
+							response[0] = OpAck
 							binary.LittleEndian.PutUint32(response[1:], slot)
 							mutex.Lock()
 							err = client.Write(response)
