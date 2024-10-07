@@ -318,11 +318,13 @@ func (node *Node) Accept(
 								}
 								//
 
+								fmt.Printf("1")
 								node.Log.Lock.Lock()
 								//fmt.Printf("Looking for log entry %d\n", current)
 								entry, exists := node.Log.Entries[current]
 								delete(node.Log.Entries, current)
 								node.Log.Lock.Unlock()
+								fmt.Printf("2")
 								//
 								//if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
 								//	continue
@@ -340,6 +342,7 @@ func (node *Node) Accept(
 									close(entry.condition)
 								}
 
+								fmt.Printf("3")
 								node.RequestLock.Lock()
 								keyString := string(entry.key)
 								channel := node.RequestWaiter[keyString]
@@ -349,6 +352,7 @@ func (node *Node) Accept(
 								}
 								delete(node.RequestWaiter, keyString)
 								node.RequestLock.Unlock()
+								fmt.Printf("4")
 
 								//fmt.Printf("i=%d vs current=%d\n", i, current)
 							}
