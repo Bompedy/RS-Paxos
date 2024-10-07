@@ -234,12 +234,12 @@ func (node *Node) Accept(
 							node.Log.Lock.Unlock()
 
 							if exists {
-								CommitLock.Lock()
 								entry.lock.Lock()
 								entry.acked += 1
 								majority := entry.acked == entry.majority
 								entry.lock.Unlock()
 								if majority {
+									CommitLock.Lock()
 									//if entry.condition != nil {
 									//	fmt.Printf("Closing entry condition in ack\n")
 									//	close(entry.condition)
@@ -302,10 +302,10 @@ func (node *Node) Accept(
 									//	}
 									//	client.mutex.Unlock()
 									//	//}(i, node.Clients[i])
+									CommitLock.Unlock()
 								}
 
 								//fmt.Printf("Finished writing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
-								CommitLock.Unlock()
 							}
 
 							//CommitLock.Unlock()
