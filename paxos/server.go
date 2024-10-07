@@ -387,7 +387,7 @@ func (node *Node) Write(
 			continue
 		}
 		go func(index int, client Client) {
-			shard := segments[index+1]
+			shard := segments[index]
 			//shard := value
 			buffer := make([]byte, 13+len(key)+len(shard))
 			buffer[0] = OpPropose
