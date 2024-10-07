@@ -273,7 +273,7 @@ func (node *Node) Accept(
 							panic(err)
 						}
 
-						next := binary.LittleEndian.Uint32(buffer[:4])
+						next := binary.LittleEndian.Uint32(commitBuffer[:4])
 
 						go func() {
 							current := atomic.LoadUint32(&CommitIndex)
