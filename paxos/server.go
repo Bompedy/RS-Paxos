@@ -77,8 +77,14 @@ func (node *Node) Connect(
 			if err != nil {
 				panic("Error writing index!")
 			}
+			err = client.Read(indexBuffer)
+			if err != nil {
+				panic("Error reading index back!")
+			}
+
+			fmt.Printf("Added %d\n: ", indexBuffer[0])
 			//node.Clients = append(node.Clients, client)
-			node.Clients[node.Index] = client
+			node.Clients[indexBuffer[0]] = client
 		}()
 	}
 
@@ -110,7 +116,15 @@ func (node *Node) Accept(
 
 			indexBuffer := make([]byte, 1)
 			err = reader.Read(indexBuffer)
+			if err != nil {
+				panic("Error reading index!")
+			}
 			index := uint32(indexBuffer[0])
+			indexBuffer[0] = uint8(node.Index)
+			err = node.Clients[index].Write(indexBuffer)
+			if err != nil {
+				panic("Error write back index!")
+			}
 
 			go func() {
 				buffer := make([]byte, 65535)
