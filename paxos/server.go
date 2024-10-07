@@ -297,7 +297,7 @@ func (node *Node) Accept(
 							i := current
 							for {
 								i += 1
-								fmt.Printf("Looping %d up to %d", i, next)
+								fmt.Printf("Looping %d up to %d\n", i, next)
 								if i > next {
 									break
 								}
@@ -310,7 +310,7 @@ func (node *Node) Accept(
 
 								if !exists {
 									i -= 1
-									fmt.Printf("%d didnt exist, setting it to %d", i, i-1)
+									fmt.Printf("%d didnt exist, setting it to %d\n", i, i-1)
 									break
 								}
 
