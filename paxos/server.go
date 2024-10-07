@@ -274,21 +274,21 @@ func (node *Node) Accept(
 								commitBuffer := make([]byte, 5)
 								commitBuffer[0] = OpCommit
 								binary.LittleEndian.PutUint32(commitBuffer[1:5], CommitIndex)
-								fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
-								for i := 0; i < node.Total; i++ {
-									if i == node.Index {
-										continue
-									}
-									client := node.Clients[i]
-									//go func(index int, client Client) {
-									client.mutex.Lock()
-									err := client.Write(commitBuffer)
-									if err != nil {
-										panic("error writing!")
-									}
-									client.mutex.Unlock()
-									//}(i, node.Clients[i])
-								}
+								//fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
+								//for i := 0; i < node.Total; i++ {
+								//	if i == node.Index {
+								//		continue
+								//	}
+								//	client := node.Clients[i]
+								//	//go func(index int, client Client) {
+								//	client.mutex.Lock()
+								//	err := client.Write(commitBuffer)
+								//	if err != nil {
+								//		panic("error writing!")
+								//	}
+								//	client.mutex.Unlock()
+								//	//}(i, node.Clients[i])
+								//}
 
 								fmt.Printf("Finished writing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
 								CommitLock.Unlock()
@@ -301,7 +301,6 @@ func (node *Node) Accept(
 						if err != nil {
 							panic(err)
 						}
-
 						next := binary.LittleEndian.Uint32(commitBuffer[:4])
 						//fmt.Printf("Going to commit up to %d\n", next)
 
@@ -361,6 +360,7 @@ func (node *Node) Accept(
 						CommitLock.Unlock()
 
 						fmt.Printf("We commited up to %d\n", atomic.LoadUint32(&CommitIndex))
+
 						//}()
 
 					}
