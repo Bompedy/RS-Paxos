@@ -334,7 +334,7 @@ func (node *Node) Accept(
 							keyString := string(entry.key)
 							channel := node.RequestWaiter[keyString]
 							if channel != nil {
-								fmt.Printf("We closed the channel?\n")
+								fmt.Printf("We closed the channel for current=%d\n", current)
 								close(channel)
 							}
 							delete(node.RequestWaiter, keyString)
