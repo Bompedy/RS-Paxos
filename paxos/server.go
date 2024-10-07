@@ -121,9 +121,9 @@ func (node *Node) Accept(
 			go func() {
 				buffer := make([]byte, 65535)
 				for {
-					fmt.Printf("Waiting for op: %d\n", index)
+					//fmt.Printf("Waiting for op: %d\n", index)
 					err := reader.Read(buffer[:1])
-					fmt.Printf("Anything: %d\n", index)
+					//fmt.Printf("Anything: %d\n", index)
 					if err != nil {
 						panic(err)
 					}
@@ -427,7 +427,7 @@ func (node *Node) Write(
 	for i := 0; i < node.Total; i++ {
 		//fmt.Printf("Writing to index: %d\n", i)
 		if i == node.Index {
-			println("Skipping")
+			//println("Skipping")
 			continue
 		}
 		go func(index int, client Client) {
