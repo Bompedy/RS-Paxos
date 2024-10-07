@@ -261,13 +261,13 @@ func (node *Node) Accept(
 										delete(node.Log.Entries, next)
 										node.Log.Lock.Unlock()
 									} else {
-										fmt.Printf("Didn't get majority breaking")
+										fmt.Printf("Didn't get majority breaking\n")
 										break
 									}
 
 								}
 								if start == CommitIndex {
-									fmt.Printf("Start is same as commit unlocking")
+									fmt.Printf("Start is same as commit unlocking\n")
 									CommitLock.Unlock()
 									return
 								}
