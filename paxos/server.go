@@ -228,44 +228,44 @@ func (node *Node) Accept(
 
 						if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
 							fmt.Printf("We have majority on slot: %d\n", slot)
-							current := atomic.LoadUint32(&CommitIndex)
-							next := current
+							next := atomic.LoadUint32(&CommitIndex)
+							start := next
 							for {
-								var i = next + 1
+								current := atomic.LoadUint32(&CommitIndex)
 								node.Log.Lock.Lock()
-								nextEntry, nextEntryExists := node.Log.Entries[i]
+								nextEntry, nextEntryExists := node.Log.Entries[next]
 								node.Log.Lock.Unlock()
 
 								if !nextEntryExists {
-									fmt.Printf("It does not exist for %d\n", i)
+									fmt.Printf("It does not exist for %d\n", next)
 									break
 								}
 
-								fmt.Printf("Exists for %d\n", i)
+								fmt.Printf("Exists for %d\n", next)
 
 								if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
 									if !atomic.CompareAndSwapUint32(&CommitIndex, current, next) {
 										break
 									}
-									fmt.Printf("Had enough entries %d\n", i)
+									fmt.Printf("Had enough entries %d\n", next)
 									//etcdWrite(nextEntry.key, nextEntry.value)
-									fmt.Printf("Wrote it to etcd %d\n", i)
+									fmt.Printf("Wrote it to etcd %d\n", next)
 									if nextEntry.condition != nil {
 										fmt.Printf("Closing entry condition in ack\n")
 										close(nextEntry.condition)
 									}
 									node.Log.Lock.Lock()
-									delete(node.Log.Entries, i)
+									delete(node.Log.Entries, next)
 									node.Log.Lock.Unlock()
-									next = i
+									next += 1
 								} else {
 									fmt.Printf("Breaking not enough\n")
 									break
 								}
 							}
 
-							fmt.Printf("compared %d vs %d\n", next, current)
-							if next == current {
+							if start == next {
+								println("No changes returning")
 								return
 							}
 
