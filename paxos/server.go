@@ -236,6 +236,10 @@ func (node *Node) Accept(
 							majority := entry.acked == entry.majority
 							entry.lock.Unlock()
 							if majority {
+								if entry.condition != nil {
+									fmt.Printf("Closing entry condition in ack\n")
+									close(entry.condition)
+								}
 								//CommitLock.Lock()
 								//start := CommitIndex
 								//for {
