@@ -164,6 +164,7 @@ func (node *Node) Accept(
 							}
 							node.Log.Lock.Lock()
 							node.Log.Entries[slot] = entry
+							fmt.Printf("Placed entry into slot: %d\n", slot)
 							node.Log.Lock.Unlock()
 
 							//etcdWrite(key, value)
