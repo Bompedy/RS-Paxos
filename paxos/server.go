@@ -240,7 +240,7 @@ func (node *Node) Accept(
 								commitBuffer := make([]byte, 5)
 								commitBuffer[0] = OpCommit
 								binary.LittleEndian.PutUint32(buffer[1:5], current)
-								for i := range node.Clients {
+								for i := 0; i < node.Total; i++ {
 									client := node.Clients[i]
 									if client == (Client{}) {
 										continue
@@ -253,7 +253,7 @@ func (node *Node) Accept(
 											return
 										}
 										client.mutex.Unlock()
-									}(i, node.Clients[i])
+									}(i, client)
 								}
 							}
 						}()
@@ -377,7 +377,7 @@ func (node *Node) Write(
 	//etcdWrite(key, value)
 	fmt.Printf("Total clients: %d%n", len(node.Clients))
 
-	for i := range node.Clients {
+	for i := 0; i < node.Total; i++ {
 		client := node.Clients[i]
 		if client == (Client{}) {
 			continue
@@ -399,7 +399,7 @@ func (node *Node) Write(
 			if err != nil {
 				panic(err)
 			}
-		}(i, node.Clients[i])
+		}(i, client)
 	}
 
 	//block(key, value)
