@@ -130,7 +130,7 @@ func (node *Node) Accept(
 						panic(err)
 					}
 					op := buffer[0]
-					//fmt.Printf("Got op: %d %d\n", index, op)
+					fmt.Printf("Got op: %d %d\n", index, op)
 					if op == OpPropose {
 						//fmt.Printf("Got proposal from: %d\n", index)
 						err := reader.Read(buffer[:12])
@@ -141,7 +141,7 @@ func (node *Node) Accept(
 						keySize := binary.LittleEndian.Uint32(buffer[4:8])
 						valueSize := binary.LittleEndian.Uint32(buffer[8:12])
 						required := int(keySize + valueSize)
-						fmt.Printf("Does not exist for node=%d slot=%d\n", index, slot)
+						fmt.Printf("Got proposal for node=%d slot=%d\n", index, slot)
 
 						if len(buffer) < required {
 							buffer = append(buffer, make([]byte, required-len(buffer))...)
