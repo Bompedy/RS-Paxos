@@ -252,6 +252,8 @@ func (node *Node) Accept(
 									delete(node.Log.Entries, i)
 									node.Log.Lock.Unlock()
 									next = i
+								} else {
+									break
 								}
 							}
 
