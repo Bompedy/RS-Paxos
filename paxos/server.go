@@ -215,7 +215,7 @@ func (node *Node) Accept(
 						copy(value, buffer[keySize:(keySize+valueSize)])
 						go func() {
 							node.Write(key, value, false)
-							//println("Finished forwarding write from leader!")
+							println("Finished forwarding write from leader!")
 						}()
 					} else if op == OpAck {
 						err = reader.Read(buffer[:4])
