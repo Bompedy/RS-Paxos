@@ -425,7 +425,7 @@ func (node *Node) Write(
 	node.Log.Lock.Unlock()
 
 	for i := 0; i < node.Total; i++ {
-		fmt.Printf("Writing to index: %d\n", i)
+		//fmt.Printf("Writing to index: %d\n", i)
 		if i == node.Index {
 			println("Skipping")
 			continue
