@@ -289,6 +289,8 @@ func (node *Node) Accept(
 									//}(i, node.Clients[i])
 								}
 
+								fmt.Printf("Finished writing up to %d\n", CommitIndex)
+
 								CommitLock.Unlock()
 							}
 						}
