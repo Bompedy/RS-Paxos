@@ -226,6 +226,8 @@ func (node *Node) Accept(
 										break
 									}
 
+									fmt.Printf("Exists for %d\n", i)
+
 									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
 										etcdWrite(nextEntry.key, nextEntry.value)
 										if nextEntry.condition != nil {
