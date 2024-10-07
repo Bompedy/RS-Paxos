@@ -289,6 +289,7 @@ func (node *Node) Accept(
 								}
 
 								node.Log.Lock.Lock()
+								fmt.Printf("Looking for log entry %d\n", i)
 								entry, exists := node.Log.Entries[i]
 								delete(node.Log.Entries, i)
 								node.Log.Lock.Unlock()
