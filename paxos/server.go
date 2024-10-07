@@ -381,6 +381,7 @@ func (node *Node) Forward(
 		node.RequestLock.Unlock()
 		//println("Forwarded to leader!")
 		<-channel
+		println("The forward continues??")
 	} else {
 		//println("Leader got request!")
 		node.Write(key, value, true)
