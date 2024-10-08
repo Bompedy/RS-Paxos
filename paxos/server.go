@@ -216,7 +216,7 @@ func (node *Node) Accept(
 					if err != nil {
 						panic(err)
 					}
-					packetSize := binary.LittleEndian.Uint32(buffer[:4])
+					packetSize := binary.LittleEndian.Uint32(sizeBuffer[:4])
 					fmt.Printf("We got a packet for size: %d\n", packetSize)
 
 					if packetSize > uint32(len(buffer)) {
