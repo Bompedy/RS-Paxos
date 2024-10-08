@@ -299,7 +299,7 @@ func (node *Node) Accept(
 									//fmt.Printf("got majority for: %d\n", next)
 									CommitIndex = next
 									requestsIds = append(requestsIds, nextEntry.requestId)
-									etcdWrite(nextEntry.key, nextEntry.value)
+									//etcdWrite(nextEntry.key, nextEntry.value)
 									if nextEntry.condition != nil {
 										close(nextEntry.condition)
 									}
