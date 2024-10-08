@@ -373,58 +373,60 @@ func (node *Node) Accept(
 							CommitLock.Lock()
 							//node.Log.Lock.Lock()
 							value, exists := node.Log.Entries.Load(slot)
-							entry := value.(*Entry)
 							//node.Log.Lock.Unlock()
 
 							//acked := atomic.AddUint32(&entry.acked, 1)
 
-							if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
-								var requestsIds []uuid.UUID
-								start := CommitIndex
-								for {
-									next := CommitIndex + 1
+							if exists {
+								entry := value.(*Entry)
+								if atomic.AddUint32(&entry.acked, 1) == entry.majority {
+									var requestsIds []uuid.UUID
+									start := CommitIndex
+									for {
+										next := CommitIndex + 1
 
-									//node.Log.Lock.Lock()
-									nextValue, nextEntryExists := node.Log.Entries.Load(slot)
-									//nextEntry, nextEntryExists := node.Log.Entries[next]
-									//node.Log.Lock.Unlock()
-
-									if !nextEntryExists {
-										break
-									}
-
-									nextEntry := nextValue.(*Entry)
-
-									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
-										CommitIndex = next
-										requestsIds = append(requestsIds, nextEntry.requestId)
-										//etcdWrite(nextEntry.key, nextEntry.value)
-										if nextEntry.condition != nil {
-											fmt.Printf("Closing condition: %d\n", next)
-											close(nextEntry.condition)
-										}
 										//node.Log.Lock.Lock()
-										node.Log.Entries.Delete(next)
-										//delete(node.Log.Entries, next)
+										nextValue, nextEntryExists := node.Log.Entries.Load(slot)
+										//nextEntry, nextEntryExists := node.Log.Entries[next]
 										//node.Log.Lock.Unlock()
-									} else {
-										break
-									}
-								}
 
-								if start != CommitIndex {
-									packet := CommitPacket{
-										RequestIds: requestsIds,
-										Next:       CommitIndex,
-									}
-
-									fmt.Printf("Commiting up to: %d\n", packet.Next)
-
-									for i := 0; i < node.Total; i++ {
-										if i == node.Index {
-											continue
+										if !nextEntryExists {
+											break
 										}
-										node.Clients[i].WriteCommitPacket(packet)
+
+										nextEntry := nextValue.(*Entry)
+
+										if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
+											CommitIndex = next
+											requestsIds = append(requestsIds, nextEntry.requestId)
+											//etcdWrite(nextEntry.key, nextEntry.value)
+											if nextEntry.condition != nil {
+												fmt.Printf("Closing condition: %d\n", next)
+												close(nextEntry.condition)
+											}
+											//node.Log.Lock.Lock()
+											node.Log.Entries.Delete(next)
+											//delete(node.Log.Entries, next)
+											//node.Log.Lock.Unlock()
+										} else {
+											break
+										}
+									}
+
+									if start != CommitIndex {
+										packet := CommitPacket{
+											RequestIds: requestsIds,
+											Next:       CommitIndex,
+										}
+
+										fmt.Printf("Commiting up to: %d\n", packet.Next)
+
+										for i := 0; i < node.Total; i++ {
+											if i == node.Index {
+												continue
+											}
+											node.Clients[i].WriteCommitPacket(packet)
+										}
 									}
 								}
 							}
