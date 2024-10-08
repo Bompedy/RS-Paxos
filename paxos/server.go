@@ -48,6 +48,93 @@ type Entry struct {
 	requestId uint32
 }
 
+type ProposePacket struct {
+	Slot      uint32
+	Key       []byte
+	Value     []byte
+	RequestId uint32
+}
+
+type CommitPacket struct {
+	RequestIds []uint32
+	Next       uint32
+}
+
+func GetProposePacket(buffer []byte, hasSlot bool) ProposePacket {
+	requestId := binary.LittleEndian.Uint32(buffer[:4])
+	keySize := binary.LittleEndian.Uint32(buffer[4:8])
+	valueSize := binary.LittleEndian.Uint32(buffer[8:12])
+	slot := binary.LittleEndian.Uint32(buffer[12:16])
+	keyEnd := 16 + keySize
+	keyStart := 16
+	key := make([]byte, keySize)
+	value := make([]byte, valueSize)
+	copy(key, buffer[keyStart:keyEnd])
+	copy(value, buffer[keyEnd:keyEnd+valueSize])
+	return ProposePacket{
+		Slot:      slot,
+		Key:       key,
+		Value:     value,
+		RequestId: requestId,
+	}
+}
+
+func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
+	size := 17 + len(packet.Key) + len(packet.Value)
+	buffer := make([]byte, size)
+	binary.LittleEndian.PutUint32(buffer[:4], uint32(size+4))
+	buffer[5] = op
+
+	//buffer[0] = OpForward
+	binary.LittleEndian.PutUint32(buffer[5:9], packet.RequestId)
+	binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(packet.Key)))
+	binary.LittleEndian.PutUint32(buffer[13:17], uint32(len(packet.Value)))
+	binary.LittleEndian.PutUint32(buffer[17:21], packet.Slot)
+	//binary.LittleEndian.PutUint32(buffer[9:13], requestId)
+	//var keyIndex = 13 + len(key)
+	var keyEnd = 21 + len(packet.Key)
+	copy(buffer[21:keyEnd], packet.Key)
+	copy(buffer[keyEnd:keyEnd+len(packet.Value)], packet.Value)
+	client.mutex.Lock()
+	err := client.Write(buffer)
+	if err != nil {
+		panic("error forwarding to leader!")
+	}
+	client.mutex.Unlock()
+}
+
+func (client Client) WriteCommitPacket(packet CommitPacket) {
+	size := 9 + (4 * len(packet.RequestIds))
+	buffer := make([]byte, size+4)
+	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
+	buffer[5] = OpCommit
+	binary.LittleEndian.PutUint32(buffer[5:9], packet.Next)
+	binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(packet.RequestIds)))
+	for i, requestId := range packet.RequestIds {
+		binary.LittleEndian.PutUint32(buffer[13+(i*4):], requestId)
+	}
+	client.mutex.Lock()
+	err := client.Write(buffer)
+	if err != nil {
+		panic("error forwarding to leader!")
+	}
+	client.mutex.Unlock()
+}
+
+func GetCommitPacket(buffer []byte) CommitPacket {
+	next := binary.LittleEndian.Uint32(buffer[:4])
+	totalRequestIds := binary.LittleEndian.Uint32(buffer[4:8])
+	requestIds := make([]uint32, totalRequestIds)
+	for i := uint32(0); i < totalRequestIds; i++ {
+		requestIds[i] = binary.LittleEndian.Uint32(buffer[8+(i*4) : 8+(i+1)*4])
+	}
+
+	return CommitPacket{
+		Next:       next,
+		RequestIds: requestIds,
+	}
+}
+
 func (node *Node) Connect(
 	local string,
 	nodes []string,
@@ -122,61 +209,44 @@ func (node *Node) Accept(
 			index := uint32(indexBuffer[0])
 
 			go func() {
-
-			}()
-
-			go func() {
+				sizeBuffer := make([]byte, 4)
 				buffer := make([]byte, 65535)
 				for {
-					//fmt.Printf("Waiting for op: %d\n", index)
-					err := reader.Read(buffer[:1])
-					//fmt.Printf("Anything: %d\n", index)
+					err := reader.Read(sizeBuffer)
 					if err != nil {
 						panic(err)
 					}
+					packetSize := binary.LittleEndian.Uint32(buffer[:4])
+
+					if packetSize > uint32(len(buffer)) {
+						buffer = append(buffer, make([]byte, packetSize-uint32(len(buffer)))...)
+					}
+
+					err = reader.Read(buffer)
+					if err != nil {
+						panic(err)
+					}
+
 					op := buffer[0]
 					if op == OpPropose {
-						err := reader.Read(buffer[:16])
-						if err != nil {
-							panic(err)
-						}
-						slot := binary.LittleEndian.Uint32(buffer[:4])
-						keySize := binary.LittleEndian.Uint32(buffer[4:8])
-						valueSize := binary.LittleEndian.Uint32(buffer[8:12])
-						requestId := binary.LittleEndian.Uint32(buffer[12:16])
-						required := int(keySize + valueSize)
-						fmt.Printf("Got proposal for node=%d slot=%d\n", index, slot)
-
-						if len(buffer) < required {
-							buffer = append(buffer, make([]byte, required-len(buffer))...)
-						}
-
-						err = reader.Read(buffer[:(keySize + valueSize)])
-						if err != nil {
-							panic(err)
-						}
-
-						key := make([]byte, keySize)
-						value := make([]byte, valueSize)
-						copy(key, buffer[:keySize])
-						copy(value, buffer[keySize:(keySize+valueSize)])
-
+						proposal := GetProposePacket(buffer[1:], true)
 						entry := &Entry{
-							key:       key,
-							value:     value,
+							key:       proposal.Key,
+							value:     proposal.Value,
 							acked:     1,
 							majority:  uint32(node.Quorum),
 							condition: make(chan struct{}),
-							requestId: requestId,
+							requestId: proposal.RequestId,
 						}
 						node.Log.Lock.Lock()
-						node.Log.Entries[slot] = entry
+						node.Log.Entries[proposal.Slot] = entry
 						node.Log.Lock.Unlock()
 
 						go func() {
-							response := make([]byte, 5)
-							response[0] = OpAck
-							binary.LittleEndian.PutUint32(response[1:], slot)
+							response := make([]byte, 9)
+							binary.LittleEndian.PutUint32(response[:4], 5)
+							response[5] = OpAck
+							binary.LittleEndian.PutUint32(response[5:], proposal.Slot)
 							client := node.Clients[index]
 							client.mutex.Lock()
 							err = client.Write(response)
@@ -184,35 +254,16 @@ func (node *Node) Accept(
 							if err != nil {
 								panic(err)
 							}
-							fmt.Printf("Acked back for node=%d slot=%d\n", index, slot)
+							fmt.Printf("Acked back for node=%d slot=%d\n", index, proposal.Slot)
 						}()
 					} else if op == OpForward {
 						fmt.Printf("Got forward from: %d\n", index)
-						err := reader.Read(buffer[:12])
-						if err != nil {
-							panic(err)
-						}
-						keySize := binary.LittleEndian.Uint32(buffer[:4])
-						valueSize := binary.LittleEndian.Uint32(buffer[4:8])
-						requestId := binary.LittleEndian.Uint32(buffer[8:12])
-						required := int(keySize + valueSize)
-						if len(buffer) < required {
-							buffer = append(buffer, make([]byte, required-len(buffer))...)
-						}
-						err = reader.Read(buffer[:(keySize + valueSize)])
-						key := make([]byte, keySize)
-						value := make([]byte, valueSize)
-						copy(key, buffer[:keySize])
-						copy(value, buffer[keySize:(keySize+valueSize)])
+						forward := GetProposePacket(buffer[1:], false)
 						go func() {
-							node.Write(key, value, false, requestId)
+							node.Write(forward.Key, forward.Value, false, forward.RequestId)
 						}()
 					} else if op == OpAck {
-						err = reader.Read(buffer[:4])
-						if err != nil {
-							panic(err)
-						}
-						slot := binary.LittleEndian.Uint32(buffer[:4])
+						slot := binary.LittleEndian.Uint32(buffer[1:5])
 						fmt.Printf("\nGot ack from %d for %d\n", index, slot)
 						go func() {
 							node.Log.Lock.Lock()
@@ -235,10 +286,6 @@ func (node *Node) Accept(
 										fmt.Printf("Does not exist for node=%d slot=%d next=%d\n", index, slot, next)
 										break
 									}
-									//
-									//nextEntry.lock.Lock()
-									//nextMajority := nextEntry.acked >= nextEntry.majority
-									//nextEntry.lock.Unlock()
 
 									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
 										fmt.Printf("Got next majority for node=%d slot=%d next=%d\n", index, slot, next)
@@ -262,63 +309,36 @@ func (node *Node) Accept(
 									fmt.Printf("Start is the same for node=%d slot=%d start=%d commitIndex=%d\n", index, slot, start, CommitIndex)
 									CommitLock.Unlock()
 								} else {
-									//fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
-									commitBuffer := make([]byte, 9+(4*len(requestsIds)))
-									commitBuffer[0] = OpCommit
-									binary.LittleEndian.PutUint32(commitBuffer[1:5], CommitIndex)
-									CommitLock.Unlock()
-									binary.LittleEndian.PutUint32(commitBuffer[5:9], uint32(len(requestsIds)))
-									for i, requestId := range requestsIds {
-										binary.LittleEndian.PutUint32(commitBuffer[9+(i*4):], requestId)
+
+									packet := CommitPacket{
+										RequestIds: requestsIds,
+										Next:       CommitIndex,
 									}
+
+									CommitLock.Unlock()
 
 									fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
 									for i := 0; i < node.Total; i++ {
 										if i == node.Index {
 											continue
 										}
-										//client := node.Clients[i]
 										go func(index int, client Client) {
-											client.mutex.Lock()
-											err := client.Write(commitBuffer)
-											if err != nil {
-												panic("error writing!")
-											}
-											client.mutex.Unlock()
+											client.WriteCommitPacket(packet)
 										}(i, node.Clients[i])
 									}
-									//CommitLock.Unlock()
 								}
 							}
 						}()
 					} else if op == OpCommit {
-						//println("Got commit")
-						commitBuffer := make([]byte, 8)
-						err = reader.Read(commitBuffer)
-						if err != nil {
-							panic(err)
-						}
-						next := binary.LittleEndian.Uint32(commitBuffer[:4])
-						totalRequestIds := binary.LittleEndian.Uint32(commitBuffer[4:8])
-						requestIds := make([]uint32, totalRequestIds)
-						requestIdsBuffer := make([]byte, totalRequestIds*4)
-						err = reader.Read(requestIdsBuffer)
-						if err != nil {
-							panic(err)
-						}
-						for i := uint32(0); i < totalRequestIds; i++ {
-							requestIds[i] = binary.LittleEndian.Uint32(requestIdsBuffer[i*4 : (i+1)*4])
-							fmt.Printf("Got request id: %d\n", requestIds[i])
-						}
-						//fmt.Printf("Going to commit up to %d\n", next)
+						commitPacket := GetCommitPacket(buffer[1:])
 
 						go func() {
 							CommitLock.Lock()
 							for {
-								fmt.Printf("Committing up to %d from %d\n", next, CommitIndex)
+								fmt.Printf("Committing up to %d from %d\n", commitPacket.Next, CommitIndex)
 								current := CommitIndex + 1
 								//fmt.Printf("Looping %d up to %d\n", current, next)
-								if current > next {
+								if current > commitPacket.Next {
 									fmt.Printf("Too big\n")
 									break
 								}
@@ -343,19 +363,19 @@ func (node *Node) Accept(
 									close(entry.condition)
 								}
 
-								fmt.Printf("Which index did we get?: current=%d, next=%d, total=%d", int32(current), int32(next), int32(totalRequestIds))
+								fmt.Printf("Which index did we get?: current=%d, next=%d, total=%d", int32(current), int32(commitPacket.Next), len(commitPacket.RequestIds))
 
-								requestIndex := (int32(current) - (int32(next) - int32(totalRequestIds))) - 1
+								requestIndex := (int32(current) - (int32(commitPacket.Next) - int32(len(commitPacket.RequestIds)))) - 1
 								fmt.Printf("Request index: %d\n", requestIndex)
 								if requestIndex >= 0 {
 									node.RequestLock.Lock()
 									fmt.Printf("Total in there: %d\n", len(node.RequestWaiter))
-									channel := node.RequestWaiter[requestIds[requestIndex]]
+									channel := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
 									if channel != nil {
 										fmt.Printf("We closed the channel for current=%d\n", current)
 										close(channel)
 									}
-									delete(node.RequestWaiter, requestIds[requestIndex])
+									delete(node.RequestWaiter, commitPacket.RequestIds[requestIndex])
 									node.RequestLock.Unlock()
 								}
 							}
@@ -374,7 +394,18 @@ func (node *Node) Accept(
 	}
 }
 
-func (node *Node) Forward(
+func (node *Node) ForwardRead(
+	key []byte,
+	etcdRead func(key []byte) []byte,
+) []byte {
+	if node.Index != node.Leader {
+		// forward
+	}
+
+	return etcdRead(key)
+}
+
+func (node *Node) ForwardWrite(
 	key []byte,
 	value []byte,
 ) {
@@ -382,21 +413,14 @@ func (node *Node) Forward(
 	requestId := uint32(node.Index<<6 | int(atomic.AddUint32(&RequestId, 1)))
 	if node.Index != node.Leader {
 		println("Leader didnt get request forwarding!")
-		buffer := make([]byte, 13+len(key)+len(value))
-		buffer[0] = OpForward
-		binary.LittleEndian.PutUint32(buffer[1:5], uint32(len(key)))
-		binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(value)))
-		binary.LittleEndian.PutUint32(buffer[9:13], requestId)
-		var keyIndex = 13 + len(key)
-		copy(buffer[13:keyIndex], key)
-		copy(buffer[keyIndex:keyIndex+len(value)], value)
-		var leader = node.Clients[node.Leader]
-		leader.mutex.Lock()
-		err := leader.Write(buffer)
-		if err != nil {
-			panic("error forwarding to leader!")
+		packet := ProposePacket{
+			Slot:      0,
+			RequestId: requestId,
+			Key:       key,
+			Value:     value,
 		}
-		leader.mutex.Unlock()
+
+		node.Clients[node.Leader].WriteProposePacket(packet, OpForward)
 		channel := make(chan struct{})
 		node.RequestLock.Lock()
 		_, exists := node.RequestWaiter[requestId]
@@ -405,9 +429,9 @@ func (node *Node) Forward(
 		}
 		node.RequestWaiter[requestId] = channel
 		node.RequestLock.Unlock()
-		<-channel // waiting on commit message for this key, to close this channel
+		<-channel
 	} else {
-		node.Write(key, value, true, requestId) // waits on enough acks, (ack receiver closes channel inside of node.Write())
+		node.Write(key, value, true, requestId)
 	}
 }
 
@@ -453,35 +477,20 @@ func (node *Node) Write(
 	node.Log.Lock.Unlock()
 
 	for i := 0; i < node.Total; i++ {
-		//fmt.Printf("Writing to index: %d\n", i)
 		if i == node.Index {
-			//println("Skipping")
 			continue
 		}
 		go func(index int, client Client) {
-			shard := segments[index]
-			//shard := value
-			buffer := make([]byte, 17+len(key)+len(shard))
-			buffer[0] = OpPropose
-			binary.LittleEndian.PutUint32(buffer[1:5], appliedIndex)
-			binary.LittleEndian.PutUint32(buffer[5:9], uint32(len(key)))
-			binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(shard)))
-			binary.LittleEndian.PutUint32(buffer[13:17], requestId)
-			keyIndex := 17 + len(key)
-			copy(buffer[17:keyIndex], key)
-			copy(buffer[keyIndex:keyIndex+len(shard)], shard)
-			client.mutex.Lock()
-			err := client.Write(buffer)
-			client.mutex.Unlock()
-			if err != nil {
-				panic(err)
-			}
+			client.WriteProposePacket(ProposePacket{
+				Key:       key,
+				Value:     segments[index],
+				Slot:      appliedIndex,
+				RequestId: requestId,
+			}, OpPropose)
 		}(i, node.Clients[i])
 	}
 
-	//block(key, value)
 	if wait {
 		<-entry.condition
 	}
-	//println("passed condition!")
 }
