@@ -279,6 +279,7 @@ func (node *Node) Accept(
 								start := CommitIndex
 								for {
 									next := CommitIndex + 1
+									fmt.Printf("looping then?: %d\n", slot)
 
 									node.Log.Lock.Lock()
 									nextEntry, nextEntryExists := node.Log.Entries[next]
