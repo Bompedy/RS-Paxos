@@ -81,7 +81,7 @@ func GetProposePacket(buffer []byte, hasSlot bool) ProposePacket {
 
 func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
 	size := 17 + len(packet.Key) + len(packet.Value)
-	fmt.Printf("Writing out proposal with size: %d\n", size)
+	fmt.Printf("Writing out proposal with size key=%d value=%d: %d\n", len(packet.Key), len(packet.Value), size)
 	buffer := make([]byte, size+4)
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
 	buffer[5] = op
