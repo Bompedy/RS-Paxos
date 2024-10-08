@@ -376,6 +376,8 @@ func (node *Node) Accept(
 							entry := value.(*Entry)
 							//node.Log.Lock.Unlock()
 
+							acked := atomic.AddUint32(&entry.acked, 1)
+
 							if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
 								var requestsIds []uuid.UUID
 								start := CommitIndex
@@ -398,6 +400,7 @@ func (node *Node) Accept(
 										requestsIds = append(requestsIds, nextEntry.requestId)
 										//etcdWrite(nextEntry.key, nextEntry.value)
 										if nextEntry.condition != nil {
+											fmt.Printf("Closing condition: %d\n", next)
 											close(nextEntry.condition)
 										}
 										//node.Log.Lock.Lock()
