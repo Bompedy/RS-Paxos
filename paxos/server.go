@@ -258,6 +258,7 @@ func (node *Node) Accept(
 						if err != nil {
 							panic(err)
 						}
+						fmt.Printf("Write it out\n")
 						//}()
 					} else if op == OpForward {
 						fmt.Printf("Gonna forward packet\n")
