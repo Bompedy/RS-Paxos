@@ -245,6 +245,7 @@ func (node *Node) Accept(
 						}
 
 						requestIndex := int32(len(commit.RequestIds)) - (int32(commit.Next) - int32(current)) - 1
+						fmt.Printf("request index requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
 
 						if requestIndex >= 0 {
 							value, exists := node.RequestWaiter.Load(commit.RequestIds[requestIndex])
@@ -260,7 +261,7 @@ func (node *Node) Accept(
 							})
 							//fmt.Printf("Request waiter size %d\n", count)
 						} else {
-							fmt.Printf("request index too large requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
+							//fmt.Printf("request index too large requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
 						}
 					}
 				}
@@ -394,9 +395,7 @@ func (node *Node) Accept(
 					} else if op == OpCommit {
 						commitPacket := GetCommitPacket(buffer[1:])
 						//fmt.Printf("Commiting up to: %d\n", commitPacket.Next)
-						go func() {
-							commitChannel <- commitPacket
-						}()
+						commitChannel <- commitPacket
 					}
 				}
 			}()
