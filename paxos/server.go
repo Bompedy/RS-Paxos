@@ -218,6 +218,7 @@ func (node *Node) Accept(
 				sizeBuffer := make([]byte, 4)
 				buffer := make([]byte, 65535)
 				for {
+					fmt.Printf("Waiting for packet from %d\n", index)
 					err := reader.Read(sizeBuffer)
 					if err != nil {
 						panic(err)
@@ -231,6 +232,8 @@ func (node *Node) Accept(
 					if err != nil {
 						panic(err)
 					}
+
+					fmt.Printf("Got packet from %d\n", index)
 
 					op := buffer[0]
 					if op == OpPropose {
