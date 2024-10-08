@@ -276,11 +276,11 @@ func (node *Node) Accept(
 								//fmt.Printf("Got enough acks for: %d\n", slot)
 								var requestsIds []uuid.UUID
 								//CommitLock.Lock()
-								fmt.Printf("Aquired lock for: %d\n", slot)
+								//fmt.Printf("Aquired lock for: %d\n", slot)
 								start := CommitIndex
 								for {
 									next := CommitIndex + 1
-									fmt.Printf("looping then?: %d\n", slot)
+									//fmt.Printf("looping then?: %d\n", slot)
 
 									node.Log.Lock.Lock()
 									nextEntry, nextEntryExists := node.Log.Entries[next]
@@ -291,7 +291,7 @@ func (node *Node) Accept(
 									}
 
 									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
-										fmt.Printf("got majority for: %d\n", next)
+										//fmt.Printf("got majority for: %d\n", next)
 										CommitIndex = next
 										requestsIds = append(requestsIds, nextEntry.requestId)
 										etcdWrite(nextEntry.key, nextEntry.value)
@@ -307,7 +307,7 @@ func (node *Node) Accept(
 								}
 
 								if start == CommitIndex {
-									fmt.Printf("It's the same: %d, %d\n", start, CommitIndex)
+									//fmt.Printf("It's the same: %d, %d\n", start, CommitIndex)
 									//CommitLock.Unlock()
 								} else {
 									packet := CommitPacket{
@@ -329,7 +329,7 @@ func (node *Node) Accept(
 									}
 								}
 
-								fmt.Printf("Released lock for: %d\n", slot)
+								//fmt.Printf("Released lock for: %d\n", slot)
 							}
 							CommitLock.Unlock()
 						}()
