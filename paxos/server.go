@@ -131,6 +131,7 @@ func GetCommitPacket(buffer []byte) CommitPacket {
 	totalRequestIds := binary.LittleEndian.Uint32(buffer[4:8])
 	requestIds := make([]uuid.UUID, totalRequestIds)
 	for i := uint32(0); i < totalRequestIds; i++ {
+
 		copy(requestIds[i][:], buffer[8+(i*16):8+(i*16)+16])
 	}
 
@@ -247,19 +248,19 @@ func (node *Node) Accept(
 						node.Log.Entries[proposal.Slot] = entry
 						node.Log.Lock.Unlock()
 
-						go func() {
-							response := make([]byte, 9)
-							binary.LittleEndian.PutUint32(response[:4], 5)
-							response[4] = OpAck
-							binary.LittleEndian.PutUint32(response[5:], proposal.Slot)
-							client := node.Clients[index]
-							client.mutex.Lock()
-							err = client.Write(response)
-							client.mutex.Unlock()
-							if err != nil {
-								panic(err)
-							}
-						}()
+						//go func() {
+						response := make([]byte, 9)
+						binary.LittleEndian.PutUint32(response[:4], 5)
+						response[4] = OpAck
+						binary.LittleEndian.PutUint32(response[5:], proposal.Slot)
+						client := node.Clients[index]
+						client.mutex.Lock()
+						err = client.Write(response)
+						client.mutex.Unlock()
+						if err != nil {
+							panic(err)
+						}
+						//}()
 					} else if op == OpForward {
 						forward := GetProposePacket(buffer[1:])
 						go func() {
