@@ -272,9 +272,10 @@ func (node *Node) Accept(
 							node.Log.Lock.Unlock()
 
 							if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
-								fmt.Printf("\nGot enough acks for: %d\n", slot)
+								fmt.Printf("Got enough acks for: %d\n", slot)
 								var requestsIds []uuid.UUID
 								CommitLock.Lock()
+								fmt.Printf("Aquired lock for: %d\n", slot)
 								start := CommitIndex
 								for {
 									next := CommitIndex + 1
