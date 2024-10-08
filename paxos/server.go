@@ -343,11 +343,12 @@ func (node *Node) Accept(
 						go func() {
 							CommitLock.Lock()
 							for {
-								fmt.Printf("Is someone stuck?: %d\n", commitPacket.Next)
 								current := CommitIndex + 1
 								if current > commitPacket.Next {
 									break
 								}
+
+								fmt.Printf("Is someone stuck?: %d\n", current)
 
 								node.Log.Lock.Lock()
 								entry, exists := node.Log.Entries[current]
@@ -373,6 +374,7 @@ func (node *Node) Accept(
 									node.RequestLock.Lock()
 									channel := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
 									if channel != nil {
+										fmt.Printf("Released channel: %d\n", current)
 										close(channel)
 									}
 									delete(node.RequestWaiter, commitPacket.RequestIds[requestIndex])
