@@ -297,10 +297,12 @@ func (node *Node) Accept(
 							//fmt.Printf("Request Lock size before: %d\n", len(node.RequestWaiter))
 							if exists {
 								channel := value.(chan struct{})
-								if channel != nil {
-									fmt.Printf("Released channel: current=%d id=%s\n", current, commit.RequestIds[requestIndex].String())
-									close(entry.condition)
-								}
+								fmt.Printf("Released channel: current=%d id=%s\n", current, commit.RequestIds[requestIndex].String())
+								close(entry.condition)
+								//if channel != nil {
+								//	fmt.Printf("Released channel: current=%d id=%s\n", current, commit.RequestIds[requestIndex].String())
+								//	close(entry.condition)
+								//}
 								node.RequestWaiter.Delete(commit.RequestIds[requestIndex])
 							} else {
 								println("Didn't find request!")
