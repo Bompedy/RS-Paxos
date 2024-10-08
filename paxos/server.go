@@ -461,6 +461,7 @@ func (node *Node) Write(
 	}
 
 	appliedIndex := atomic.AddUint32(&AppliedIndex, 1)
+	fmt.Printf("Got forward: %d\n", appliedIndex)
 	entry := &Entry{
 		key:       key,
 		value:     value,
