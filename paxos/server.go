@@ -341,53 +341,53 @@ func (node *Node) Accept(
 						commitPacket := GetCommitPacket(buffer[1:])
 						fmt.Printf("Commiting up to: %d\n", commitPacket.Next)
 
-						go func() {
-							fmt.Printf("spawned another goroutine: %d\n", commitPacket.Next)
-							fmt.Printf("Total gorouitnes: %d\n", runtime.NumGoroutine())
-							CommitLock.Lock()
-							for {
-								current := CommitIndex + 1
-								if current > commitPacket.Next {
-									break
-								}
-
-								fmt.Printf("Is someone stuck?: %d\n", current)
-
-								node.Log.Lock.Lock()
-								entry, exists := node.Log.Entries[current]
-								delete(node.Log.Entries, current)
-								node.Log.Lock.Unlock()
-								//
-								//if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
-								//	continue
-								//}
-								CommitIndex = current
-
-								if !exists {
-									panic("major problem")
-								}
-
-								etcdWrite(entry.key, entry.value)
-								if entry.condition != nil {
-									close(entry.condition)
-								}
-
-								requestIndex := (int32(current) - (int32(commitPacket.Next) - int32(len(commitPacket.RequestIds)))) - 1
-								if requestIndex >= 0 {
-									node.RequestLock.Lock()
-									channel := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
-									if channel != nil {
-										fmt.Printf("Released channel: current=%d id=%s\n", current, commitPacket.RequestIds[requestIndex].String())
-										close(channel)
-									}
-									delete(node.RequestWaiter, commitPacket.RequestIds[requestIndex])
-									node.RequestLock.Unlock()
-								}
+						//go func() {
+						fmt.Printf("spawned another goroutine: %d\n", commitPacket.Next)
+						fmt.Printf("Total gorouitnes: %d\n", runtime.NumGoroutine())
+						CommitLock.Lock()
+						for {
+							current := CommitIndex + 1
+							if current > commitPacket.Next {
+								break
 							}
 
-							fmt.Printf("Released lock: %d\n", CommitIndex)
-							CommitLock.Unlock()
-						}()
+							fmt.Printf("Is someone stuck?: %d\n", current)
+
+							node.Log.Lock.Lock()
+							entry, exists := node.Log.Entries[current]
+							delete(node.Log.Entries, current)
+							node.Log.Lock.Unlock()
+							//
+							//if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
+							//	continue
+							//}
+							CommitIndex = current
+
+							if !exists {
+								panic("major problem")
+							}
+
+							etcdWrite(entry.key, entry.value)
+							if entry.condition != nil {
+								close(entry.condition)
+							}
+
+							requestIndex := (int32(current) - (int32(commitPacket.Next) - int32(len(commitPacket.RequestIds)))) - 1
+							if requestIndex >= 0 {
+								node.RequestLock.Lock()
+								channel := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
+								if channel != nil {
+									fmt.Printf("Released channel: current=%d id=%s\n", current, commitPacket.RequestIds[requestIndex].String())
+									close(channel)
+								}
+								delete(node.RequestWaiter, commitPacket.RequestIds[requestIndex])
+								node.RequestLock.Unlock()
+							}
+						}
+
+						fmt.Printf("Released lock: %d\n", CommitIndex)
+						CommitLock.Unlock()
+						//}()
 					}
 				}
 			}()
