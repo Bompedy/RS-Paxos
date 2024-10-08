@@ -298,7 +298,7 @@ func (node *Node) Accept(
 							if exists {
 								channel := value.(chan struct{})
 								fmt.Printf("Released channel: current=%d id=%s\n", current, commit.RequestIds[requestIndex].String())
-								close(entry.condition)
+								close(channel)
 								//if channel != nil {
 								//	fmt.Printf("Released channel: current=%d id=%s\n", current, commit.RequestIds[requestIndex].String())
 								//	close(entry.condition)
