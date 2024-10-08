@@ -432,7 +432,7 @@ func (node *Node) ForwardWrite(
 		node.RequestWaiter[requestId] = channel
 		node.RequestLock.Unlock()
 		//println("Forwarded packet")
-		//time.Sleep(2 * time.Second)
+		time.Sleep(2 * time.Second)
 		<-channel
 		fmt.Printf("Forwarded packet id=%s\n", requestId.String())
 	} else {
