@@ -108,7 +108,7 @@ func (client Client) WriteCommitPacket(packet CommitPacket) {
 	size := 9 + (4 * len(packet.RequestIds))
 	buffer := make([]byte, size+4)
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
-	buffer[5] = OpCommit
+	buffer[4] = OpCommit
 	binary.LittleEndian.PutUint32(buffer[5:9], packet.Next)
 	binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(packet.RequestIds)))
 	for i, requestId := range packet.RequestIds {
