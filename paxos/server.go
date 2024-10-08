@@ -383,15 +383,24 @@ func (node *Node) Accept(
 
 								CommitIndex = current
 
+								// leader - 6-10          uuids[0] uuids[1] uuids[2] uuids[3]
+								// follower - 6
+
+								// (7 - (10 - 4)) - 1
+
 								requestIndex := (int32(current) - (int32(commitPacket.Next) - int32(len(commitPacket.RequestIds)))) - 1
 								if requestIndex >= 0 {
 									node.RequestLock.Lock()
-									channel := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
-									if channel != nil {
-										fmt.Printf("Released channel: current=%d id=%s\n", current, commitPacket.RequestIds[requestIndex].String())
-										close(channel)
+									channel, exists := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
+									if exists {
+										if channel != nil {
+											fmt.Printf("Released channel: current=%d id=%s\n", current, commitPacket.RequestIds[requestIndex].String())
+											close(channel)
+										}
+										delete(node.RequestWaiter, commitPacket.RequestIds[requestIndex])
+									} else {
+										println("Didn't find request!")
 									}
-									delete(node.RequestWaiter, commitPacket.RequestIds[requestIndex])
 									node.RequestLock.Unlock()
 								}
 							}
