@@ -380,6 +380,7 @@ func (node *Node) Accept(
 									}
 								}
 							}
+							fmt.Printf("Releasing lock: %d\n", slot)
 							CommitLock.Unlock()
 						}()
 					} else if op == OpCommit {
