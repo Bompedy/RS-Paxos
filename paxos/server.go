@@ -223,7 +223,6 @@ func (node *Node) Accept(
 						panic(err)
 					}
 					packetSize := binary.LittleEndian.Uint32(sizeBuffer[:4])
-
 					if packetSize > uint32(len(buffer)) {
 						buffer = append(buffer, make([]byte, packetSize-uint32(len(buffer)))...)
 					}
@@ -275,7 +274,7 @@ func (node *Node) Accept(
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
 						//go func() {
-						CommitLock.Lock()
+						//CommitLock.Lock()
 						node.Log.Lock.Lock()
 						entry, exists := node.Log.Entries[slot]
 						node.Log.Lock.Unlock()
