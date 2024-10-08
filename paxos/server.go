@@ -475,6 +475,7 @@ func (node *Node) Write(
 		}
 		i := i
 		go func(index int, client Client) {
+			fmt.Printf("Sending proposal %d to %d\n", appliedIndex, i)
 			client.WriteProposePacket(ProposePacket{
 				Key:       key,
 				Value:     segments[i],
