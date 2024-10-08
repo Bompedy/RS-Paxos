@@ -367,7 +367,7 @@ func (node *Node) Accept(
 											Next:       CommitIndex,
 										}
 
-										//fmt.Printf("Commiting up to: %d\n", packet.Next)
+										fmt.Printf("Commiting up to: %d\n", packet.Next)
 
 										for i := 0; i < node.Total; i++ {
 											if i == node.Index {
