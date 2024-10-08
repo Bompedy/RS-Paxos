@@ -391,6 +391,7 @@ func (node *Node) Accept(
 
 								requestIndex := (int32(current) - (int32(commitPacket.Next) - int32(len(commitPacket.RequestIds)))) - 1
 								if requestIndex >= 0 {
+									fmt.Printf("TAKE REQUEST LOCK %d\n!", current)
 									node.RequestLock.Lock()
 									channel, exists := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
 									if exists {
@@ -403,6 +404,7 @@ func (node *Node) Accept(
 										println("Didn't find request!")
 									}
 									node.RequestLock.Unlock()
+									fmt.Printf("RELEASED REQUEST LOCK %d\n!.", current)
 								}
 							}
 
