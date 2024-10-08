@@ -326,7 +326,7 @@ func (node *Node) Accept(
 						}()
 					} else if op == OpCommit {
 						commitPacket := GetCommitPacket(buffer[1:])
-						fmt.Printf("Commiting up to: %d", commitPacket.Next)
+						fmt.Printf("Commiting up to: %d\n", commitPacket.Next)
 
 						go func() {
 							CommitLock.Lock()
