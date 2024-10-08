@@ -315,6 +315,7 @@ func (node *Node) Accept(
 						}
 						for i := uint32(0); i < totalRequestIds; i++ {
 							requestIds[i] = binary.LittleEndian.Uint32(requestIdsBuffer[i*4 : (i+1)*4])
+							fmt.Printf("Got request id: %d\n", requestIds[i])
 						}
 						//fmt.Printf("Going to commit up to %d\n", next)
 
@@ -351,6 +352,7 @@ func (node *Node) Accept(
 								}
 
 								requestIndex := int32(current) - (int32(next) - int32(totalRequestIds))
+								fmt.Printf("Request index: %d\n", requestIndex)
 								if requestIndex >= 0 {
 									node.RequestLock.Lock()
 									fmt.Printf("Total in there: %d\n", len(node.RequestWaiter))
