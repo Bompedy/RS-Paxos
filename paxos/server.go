@@ -7,6 +7,7 @@ import (
 	"github.com/klauspost/reedsolomon"
 	"math"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
 )
@@ -342,6 +343,7 @@ func (node *Node) Accept(
 
 						go func() {
 							fmt.Printf("spawned another goroutine: %d\n", commitPacket.Next)
+							fmt.Printf("Total gorouitnes: %d\n", runtime.NumGoroutine())
 							CommitLock.Lock()
 							for {
 								current := CommitIndex + 1
