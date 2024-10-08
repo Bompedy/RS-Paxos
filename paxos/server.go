@@ -224,10 +224,13 @@ func (node *Node) Accept(
 						buffer = append(buffer, make([]byte, packetSize-uint32(len(buffer)))...)
 					}
 
+					fmt.Printf("Waiting for next read: %d\n", packetSize)
 					err = reader.Read(buffer)
 					if err != nil {
 						panic(err)
 					}
+
+					fmt.Printf("Got it: %d\n", packetSize)
 
 					op := buffer[0]
 					if op == OpPropose {
