@@ -37,7 +37,7 @@ type Node struct {
 
 type Log struct {
 	Lock    *sync.Mutex
-	Entries map[uint32]*Entry
+	Entries sync.Map
 }
 
 type Entry struct {
@@ -230,20 +230,21 @@ func (node *Node) Accept(
 						// wait for it to get in our log i guess :3
 						for {
 							//fmt.Printf("grabbing lock?: %d\n", current)
-							node.Log.Lock.Lock()
-							mapEntry, exists := node.Log.Entries[current]
+							//node.Log.Lock.Lock()
+							value, exists := node.Log.Entries.Load(current)
 							if exists {
-								entry = *mapEntry
-								delete(node.Log.Entries, current)
-								node.Log.Lock.Unlock()
+								entry = *(value.(*Entry))
+								node.Log.Entries.Delete(current)
+								//delete(node.Log.Entries, current)
+								//node.Log.Lock.Unlock()
 								break
 							} else {
 								//time.Sleep(5 * time.Second)
 								fmt.Printf("we are so stuck on %d\n", current)
 							}
 
-							node.Log.Lock.Unlock()
-							time.Sleep(10 * time.Millisecond)
+							//node.Log.Lock.Unlock()
+							time.Sleep(10 * time.Millisecond) // give a little time so lock can be aquired
 							//fmt.Printf("releasing lock?: %d\n", current)
 						}
 						//
@@ -340,11 +341,12 @@ func (node *Node) Accept(
 							condition: make(chan struct{}),
 							requestId: proposal.RequestId,
 						}
-						fmt.Printf("Aquiring lock for %d\n", proposal.Slot)
-						node.Log.Lock.Lock()
-						fmt.Printf("Got lock for %d\n", proposal.Slot)
-						node.Log.Entries[proposal.Slot] = entry
-						node.Log.Lock.Unlock()
+						//fmt.Printf("Aquiring lock for %d\n", proposal.Slot)
+						////node.Log.Lock.Lock()
+						//fmt.Printf("Got lock for %d\n", proposal.Slot)
+						node.Log.Entries.Store(proposal.Slot, entry)
+						//node.Log.Entries[proposal.Slot] = entry
+						//node.Log.Lock.Unlock()
 
 						go func() {
 							// ack
@@ -369,9 +371,10 @@ func (node *Node) Accept(
 						slot := binary.LittleEndian.Uint32(buffer[1:])
 						go func() {
 							CommitLock.Lock()
-							node.Log.Lock.Lock()
-							entry, exists := node.Log.Entries[slot]
-							node.Log.Lock.Unlock()
+							//node.Log.Lock.Lock()
+							value, exists := node.Log.Entries.Load(slot)
+							entry := value.(*Entry)
+							//node.Log.Lock.Unlock()
 
 							if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
 								var requestsIds []uuid.UUID
@@ -379,9 +382,11 @@ func (node *Node) Accept(
 								for {
 									next := CommitIndex + 1
 
-									node.Log.Lock.Lock()
-									nextEntry, nextEntryExists := node.Log.Entries[next]
-									node.Log.Lock.Unlock()
+									//node.Log.Lock.Lock()
+									nextValue, nextEntryExists := node.Log.Entries.Load(slot)
+									nextEntry := nextValue.(*Entry)
+									//nextEntry, nextEntryExists := node.Log.Entries[next]
+									//node.Log.Lock.Unlock()
 
 									if !nextEntryExists {
 										break
@@ -394,9 +399,10 @@ func (node *Node) Accept(
 										if nextEntry.condition != nil {
 											close(nextEntry.condition)
 										}
-										node.Log.Lock.Lock()
-										delete(node.Log.Entries, next)
-										node.Log.Lock.Unlock()
+										//node.Log.Lock.Lock()
+										node.Log.Entries.Delete(next)
+										//delete(node.Log.Entries, next)
+										//node.Log.Lock.Unlock()
 									} else {
 										break
 									}
@@ -509,9 +515,11 @@ func (node *Node) Write(
 		condition: make(chan struct{}),
 		requestId: requestId,
 	}
-	node.Log.Lock.Lock()
-	node.Log.Entries[appliedIndex] = entry
-	node.Log.Lock.Unlock()
+	node.Log.Entries.Store(appliedIndex, entry)
+	//
+	//node.Log.Lock.Lock()
+	//node.Log.Entries[appliedIndex] = entry
+	//node.Log.Lock.Unlock()
 
 	for i := 0; i < node.Total; i++ {
 		if i == node.Index {
