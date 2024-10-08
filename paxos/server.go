@@ -267,12 +267,13 @@ func (node *Node) Accept(
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
 						//go func() {
+						CommitLock.Lock()
 						node.Log.Lock.Lock()
 						entry, exists := node.Log.Entries[slot]
 						node.Log.Lock.Unlock()
 
 						fmt.Printf("grabbing lock: %d\n", slot)
-						CommitLock.Lock()
+						//CommitLock.Lock()
 						if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
 							//fmt.Printf("Got enough acks for: %d\n", slot)
 							var requestsIds []uuid.UUID
@@ -413,6 +414,7 @@ func (node *Node) ForwardWrite(
 			Value:     value,
 		}
 
+		fmt.Printf("Forwarding packet!\n")
 		node.Clients[node.Leader].WriteProposePacket(packet, OpForward)
 		channel := make(chan struct{})
 		node.RequestLock.Lock()
