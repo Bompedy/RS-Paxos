@@ -271,6 +271,7 @@ func (node *Node) Accept(
 							entry, exists := node.Log.Entries[slot]
 							node.Log.Lock.Unlock()
 
+							fmt.Printf("grabbing lock: %d\n", slot)
 							CommitLock.Lock()
 							if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
 								//fmt.Printf("Got enough acks for: %d\n", slot)
@@ -332,6 +333,7 @@ func (node *Node) Accept(
 								//fmt.Printf("Released lock for: %d\n", slot)
 							}
 							CommitLock.Unlock()
+							fmt.Printf("released lock: %d\n", slot)
 						}()
 					} else if op == OpCommit {
 						commitPacket := GetCommitPacket(buffer[1:])
