@@ -217,6 +217,7 @@ func (node *Node) Accept(
 			commitChannel := make(chan CommitPacket)
 			go func() {
 				for commit := range commitChannel {
+					println("Got commit!")
 					for {
 						current := CommitIndex + 1
 						if current > commit.Next {
