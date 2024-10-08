@@ -233,7 +233,7 @@ func (node *Node) Accept(
 						panic(err)
 					}
 
-					fmt.Printf("Got packet from node=%d op=\n", index, buffer[0])
+					fmt.Printf("Got packet from node=%d op=%d\n", index, buffer[0])
 
 					op := buffer[0]
 					if op == OpPropose {
