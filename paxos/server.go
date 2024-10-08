@@ -259,6 +259,8 @@ func (node *Node) Accept(
 								return true // continue iterating
 							})
 							fmt.Printf("Request waiter size %d\n", count)
+						} else {
+							fmt.Printf("request index too large requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
 						}
 					}
 				}
