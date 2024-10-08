@@ -384,13 +384,14 @@ func (node *Node) Accept(
 
 									//node.Log.Lock.Lock()
 									nextValue, nextEntryExists := node.Log.Entries.Load(slot)
-									nextEntry := nextValue.(*Entry)
 									//nextEntry, nextEntryExists := node.Log.Entries[next]
 									//node.Log.Lock.Unlock()
 
 									if !nextEntryExists {
 										break
 									}
+
+									nextEntry := nextValue.(*Entry)
 
 									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
 										CommitIndex = next
