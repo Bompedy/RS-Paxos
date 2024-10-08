@@ -82,7 +82,6 @@ func GetProposePacket(buffer []byte) ProposePacket {
 func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
 	size := 17 + len(packet.Key) + len(packet.Value)
 	buffer := make([]byte, size+4)
-	fmt.Printf("Writing out proposal op=%d: %d\n", op, size)
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
 	buffer[4] = op
 
@@ -218,7 +217,6 @@ func (node *Node) Accept(
 						panic(err)
 					}
 					packetSize := binary.LittleEndian.Uint32(sizeBuffer[:4])
-					fmt.Printf("Got packet %d\n", packetSize)
 
 					if packetSize > uint32(len(buffer)) {
 						buffer = append(buffer, make([]byte, packetSize-uint32(len(buffer)))...)
@@ -228,7 +226,6 @@ func (node *Node) Accept(
 					if err != nil {
 						panic(err)
 					}
-					fmt.Printf("Read bytes buffer[0]=%d, buffer[1]=%d\n", buffer[0], buffer[1])
 
 					op := buffer[0]
 					if op == OpPropose {
@@ -245,129 +242,126 @@ func (node *Node) Accept(
 						node.Log.Entries[proposal.Slot] = entry
 						node.Log.Lock.Unlock()
 
-						fmt.Printf("Got proposal\n")
-						//go func() {
-						response := make([]byte, 9)
-						binary.LittleEndian.PutUint32(response[:4], 5)
-						response[4] = OpAck
-						binary.LittleEndian.PutUint32(response[5:], proposal.Slot)
-						client := node.Clients[index]
-						client.mutex.Lock()
-						err = client.Write(response)
-						client.mutex.Unlock()
-						if err != nil {
-							panic(err)
-						}
-						fmt.Printf("Write it out\n")
-						//}()
+						go func() {
+							response := make([]byte, 9)
+							binary.LittleEndian.PutUint32(response[:4], 5)
+							response[4] = OpAck
+							binary.LittleEndian.PutUint32(response[5:], proposal.Slot)
+							client := node.Clients[index]
+							client.mutex.Lock()
+							err = client.Write(response)
+							client.mutex.Unlock()
+							if err != nil {
+								panic(err)
+							}
+						}()
 					} else if op == OpForward {
-						fmt.Printf("Gonna forward packet\n")
 						forward := GetProposePacket(buffer[1:])
 						go func() {
 							node.Write(forward.Key, forward.Value, false, forward.RequestId)
 						}()
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
-						//go func() {
-						node.Log.Lock.Lock()
-						entry, exists := node.Log.Entries[slot]
-						node.Log.Lock.Unlock()
+						go func() {
+							node.Log.Lock.Lock()
+							entry, exists := node.Log.Entries[slot]
+							node.Log.Lock.Unlock()
 
-						if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
-							var requestsIds []uint32
-							CommitLock.Lock()
-							start := CommitIndex
-							for {
-								next := CommitIndex + 1
+							if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
+								var requestsIds []uint32
+								CommitLock.Lock()
+								start := CommitIndex
+								for {
+									next := CommitIndex + 1
 
-								node.Log.Lock.Lock()
-								nextEntry, nextEntryExists := node.Log.Entries[next]
-								node.Log.Lock.Unlock()
-
-								if !nextEntryExists {
-									break
-								}
-
-								if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
-									CommitIndex = next
-									requestsIds = append(requestsIds, nextEntry.requestId)
-									etcdWrite(nextEntry.key, nextEntry.value)
-									if nextEntry.condition != nil {
-										close(nextEntry.condition)
-									}
 									node.Log.Lock.Lock()
-									delete(node.Log.Entries, next)
+									nextEntry, nextEntryExists := node.Log.Entries[next]
 									node.Log.Lock.Unlock()
-								} else {
-									break
-								}
-							}
 
-							if start == CommitIndex {
-								CommitLock.Unlock()
-							} else {
-								packet := CommitPacket{
-									RequestIds: requestsIds,
-									Next:       CommitIndex,
-								}
-
-								CommitLock.Unlock()
-
-								for i := 0; i < node.Total; i++ {
-									if i == node.Index {
-										continue
+									if !nextEntryExists {
+										break
 									}
-									go func(index int, client Client) {
-										client.WriteCommitPacket(packet)
-									}(i, node.Clients[i])
+
+									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
+										CommitIndex = next
+										requestsIds = append(requestsIds, nextEntry.requestId)
+										etcdWrite(nextEntry.key, nextEntry.value)
+										if nextEntry.condition != nil {
+											close(nextEntry.condition)
+										}
+										node.Log.Lock.Lock()
+										delete(node.Log.Entries, next)
+										node.Log.Lock.Unlock()
+									} else {
+										break
+									}
+								}
+
+								if start == CommitIndex {
+									CommitLock.Unlock()
+								} else {
+									packet := CommitPacket{
+										RequestIds: requestsIds,
+										Next:       CommitIndex,
+									}
+
+									CommitLock.Unlock()
+
+									for i := 0; i < node.Total; i++ {
+										if i == node.Index {
+											continue
+										}
+										go func(index int, client Client) {
+											client.WriteCommitPacket(packet)
+										}(i, node.Clients[i])
+									}
 								}
 							}
-						}
-						//}()
+						}()
 					} else if op == OpCommit {
 						commitPacket := GetCommitPacket(buffer[1:])
 
-						//go func() {
-						CommitLock.Lock()
-						for {
-							current := CommitIndex + 1
-							if current > commitPacket.Next {
-								break
-							}
-
-							node.Log.Lock.Lock()
-							entry, exists := node.Log.Entries[current]
-							delete(node.Log.Entries, current)
-							node.Log.Lock.Unlock()
-							//
-							//if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
-							//	continue
-							//}
-							CommitIndex = current
-
-							if !exists {
-								panic("major problem")
-							}
-
-							etcdWrite(entry.key, entry.value)
-							if entry.condition != nil {
-								close(entry.condition)
-							}
-
-							requestIndex := (int32(current) - (int32(commitPacket.Next) - int32(len(commitPacket.RequestIds)))) - 1
-							if requestIndex >= 0 {
-								node.RequestLock.Lock()
-								channel := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
-								if channel != nil {
-									close(channel)
+						go func() {
+							CommitLock.Lock()
+							for {
+								current := CommitIndex + 1
+								if current > commitPacket.Next {
+									break
 								}
-								delete(node.RequestWaiter, commitPacket.RequestIds[requestIndex])
-								node.RequestLock.Unlock()
-							}
-						}
 
-						CommitLock.Unlock()
-						//}()
+								node.Log.Lock.Lock()
+								entry, exists := node.Log.Entries[current]
+								delete(node.Log.Entries, current)
+								node.Log.Lock.Unlock()
+								//
+								//if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
+								//	continue
+								//}
+								CommitIndex = current
+
+								if !exists {
+									panic("major problem")
+								}
+
+								etcdWrite(entry.key, entry.value)
+								if entry.condition != nil {
+									close(entry.condition)
+								}
+
+								requestIndex := (int32(current) - (int32(commitPacket.Next) - int32(len(commitPacket.RequestIds)))) - 1
+								if requestIndex >= 0 {
+									node.RequestLock.Lock()
+									channel := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
+									if channel != nil {
+										close(channel)
+									}
+									delete(node.RequestWaiter, commitPacket.RequestIds[requestIndex])
+									node.RequestLock.Unlock()
+								}
+							}
+
+							CommitLock.Unlock()
+						}()
 					}
 				}
 			}()
