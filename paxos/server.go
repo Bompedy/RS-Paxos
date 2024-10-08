@@ -382,6 +382,7 @@ func (node *Node) Accept(
 								}
 							}
 
+							fmt.Printf("Released lock: %d\n", CommitIndex)
 							CommitLock.Unlock()
 						}()
 					}
