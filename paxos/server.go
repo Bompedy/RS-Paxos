@@ -350,72 +350,72 @@ func (node *Node) Accept(
 						commitPacket := GetCommitPacket(buffer[1:])
 						fmt.Printf("Commiting up to: %d\n", commitPacket.Next)
 
-						//go func() {
-						fmt.Printf("spawned another goroutine: %d\n", commitPacket.Next)
-						fmt.Printf("Total gorouitnes: %d\n", runtime.NumGoroutine())
-						CommitLock.Lock()
-						//defer CommitLock.Unlock()
-						for {
-							current := CommitIndex + 1
-							if current > commitPacket.Next {
-								break
-							}
-
-							fmt.Printf("Is someone stuck?: %d\n", current)
-
-							//node.Log.Lock.Lock()
-							//entry, exists := node.Log.Entries[current]
-							//delete(node.Log.Entries, current)
-							//node.Log.Lock.Unlock()
-							////
-							////if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
-							////	continue
-							////}
-							//
-							//if !exists {
-							//	fmt.Printf("MAJOR PROBLEM: %d\n", current)
-							//	break
-							//	//panic("major problem")
-							//}
-							//
-							//CommitIndex = current
-							//
-							////etcdWrite(entry.key, entry.value)
-							//if entry.condition != nil {
-							//	close(entry.condition)
-							//}
-
-							CommitIndex = current
-
-							// leader - 6-10          uuids[0] uuids[1] uuids[2] uuids[3]
-							// follower - 6
-
-							// (7 - (10 - 4)) - 1
-
-							requestIndex := (int32(current) - (int32(commitPacket.Next) - int32(len(commitPacket.RequestIds)))) - 1
-							if requestIndex >= 0 {
-								fmt.Printf("TAKE REQUEST LOCK %d\n!", current)
-								node.RequestLock.Lock()
-								channel, exists := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
-								fmt.Printf("Request Lock size before: %d\n", len(node.RequestWaiter))
-								if exists {
-									if channel != nil {
-										fmt.Printf("Released channel: current=%d id=%s\n", current, commitPacket.RequestIds[requestIndex].String())
-										close(channel)
-									}
-									delete(node.RequestWaiter, commitPacket.RequestIds[requestIndex])
-								} else {
-									println("Didn't find request!")
+						go func() {
+							fmt.Printf("spawned another goroutine: %d\n", commitPacket.Next)
+							fmt.Printf("Total gorouitnes: %d\n", runtime.NumGoroutine())
+							CommitLock.Lock()
+							//defer CommitLock.Unlock()
+							for {
+								current := CommitIndex + 1
+								if current > commitPacket.Next {
+									break
 								}
-								fmt.Printf("Request Lock size: %d\n", len(node.RequestWaiter))
-								node.RequestLock.Unlock()
-								fmt.Printf("RELEASED REQUEST LOCK %d\n!.", current)
-							}
-						}
 
-						fmt.Printf("Released lock: %d\n", CommitIndex)
-						CommitLock.Unlock()
-						//}()
+								fmt.Printf("Is someone stuck?: %d\n", current)
+
+								//node.Log.Lock.Lock()
+								//entry, exists := node.Log.Entries[current]
+								//delete(node.Log.Entries, current)
+								//node.Log.Lock.Unlock()
+								////
+								////if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
+								////	continue
+								////}
+								//
+								//if !exists {
+								//	fmt.Printf("MAJOR PROBLEM: %d\n", current)
+								//	break
+								//	//panic("major problem")
+								//}
+								//
+								//CommitIndex = current
+								//
+								////etcdWrite(entry.key, entry.value)
+								//if entry.condition != nil {
+								//	close(entry.condition)
+								//}
+
+								CommitIndex = current
+
+								// leader - 6-10          uuids[0] uuids[1] uuids[2] uuids[3]
+								// follower - 6
+
+								// (7 - (10 - 4)) - 1
+
+								requestIndex := (int32(current) - (int32(commitPacket.Next) - int32(len(commitPacket.RequestIds)))) - 1
+								if requestIndex >= 0 {
+									fmt.Printf("TAKE REQUEST LOCK %d\n!", current)
+									node.RequestLock.Lock()
+									channel, exists := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
+									fmt.Printf("Request Lock size before: %d\n", len(node.RequestWaiter))
+									if exists {
+										if channel != nil {
+											fmt.Printf("Released channel: current=%d id=%s\n", current, commitPacket.RequestIds[requestIndex].String())
+											close(channel)
+										}
+										delete(node.RequestWaiter, commitPacket.RequestIds[requestIndex])
+									} else {
+										println("Didn't find request!")
+									}
+									fmt.Printf("Request Lock size: %d\n", len(node.RequestWaiter))
+									node.RequestLock.Unlock()
+									fmt.Printf("RELEASED REQUEST LOCK %d\n!.", current)
+								}
+							}
+
+							fmt.Printf("Released lock: %d\n", CommitIndex)
+							CommitLock.Unlock()
+						}()
 					}
 				}
 			}()
