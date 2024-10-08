@@ -237,7 +237,7 @@ func (node *Node) Accept(
 								node.Log.Lock.Unlock()
 								break
 							} else {
-								fmt.Printf("we are so stuck")
+								fmt.Printf("we are so stuck\n")
 							}
 
 							node.Log.Lock.Unlock()
