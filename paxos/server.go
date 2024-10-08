@@ -341,6 +341,7 @@ func (node *Node) Accept(
 						fmt.Printf("Commiting up to: %d\n", commitPacket.Next)
 
 						go func() {
+							fmt.Printf("spawned another goroutine: %d\n", commitPacket.Next)
 							CommitLock.Lock()
 							for {
 								current := CommitIndex + 1
