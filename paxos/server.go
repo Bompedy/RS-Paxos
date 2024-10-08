@@ -235,6 +235,8 @@ func (node *Node) Accept(
 								delete(node.Log.Entries, current)
 								node.Log.Lock.Unlock()
 								break
+							} else {
+								fmt.Printf("we are so stuck")
 							}
 
 							node.Log.Lock.Unlock()
