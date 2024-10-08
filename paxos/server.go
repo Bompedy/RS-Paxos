@@ -430,6 +430,7 @@ func (node *Node) ForwardWrite(
 		fmt.Printf("Forwarded packet!\n")
 		//println("Forwarded packet")
 		<-channel
+		fmt.Printf("Forwarded packet!\n")
 	} else {
 		node.Write(key, value, true, requestId)
 	}
