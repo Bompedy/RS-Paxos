@@ -9,7 +9,6 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 var OpPropose = uint8(0)
@@ -236,7 +235,7 @@ func (node *Node) Accept(
 								fmt.Printf("we are so stuck on %d\n", current)
 							}
 
-							time.Sleep(5000 * time.Millisecond)
+							//time.Sleep(5000 * time.Millisecond)
 						}
 						//
 						CommitIndex = current
