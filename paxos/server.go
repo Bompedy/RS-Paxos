@@ -45,7 +45,6 @@ type Entry struct {
 	acked     uint32
 	majority  uint32
 	condition chan struct{}
-	lock      *sync.Mutex
 	requestId uint32
 }
 
@@ -168,7 +167,6 @@ func (node *Node) Accept(
 							acked:     1,
 							majority:  uint32(node.Quorum),
 							condition: make(chan struct{}),
-							lock:      &sync.Mutex{},
 							requestId: requestId,
 						}
 						node.Log.Lock.Lock()
@@ -221,79 +219,73 @@ func (node *Node) Accept(
 							entry, exists := node.Log.Entries[slot]
 							node.Log.Lock.Unlock()
 
-							if exists {
-								entry.lock.Lock()
-								entry.acked += 1
-								majority := entry.acked == entry.majority
-								entry.lock.Unlock()
-								if majority {
-									fmt.Printf("Got first majority for node=%d slot=%d\n", index, slot)
-									var requestsIds []uint32
-									CommitLock.Lock()
-									start := CommitIndex
-									for {
-										next := CommitIndex + 1
+							if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
+								fmt.Printf("Got first majority for node=%d slot=%d\n", index, slot)
+								var requestsIds []uint32
+								CommitLock.Lock()
+								start := CommitIndex
+								for {
+									next := CommitIndex + 1
 
-										node.Log.Lock.Lock()
-										nextEntry, nextEntryExists := node.Log.Entries[next]
-										node.Log.Lock.Unlock()
+									node.Log.Lock.Lock()
+									nextEntry, nextEntryExists := node.Log.Entries[next]
+									node.Log.Lock.Unlock()
 
-										if !nextEntryExists {
-											fmt.Printf("Does not exist for node=%d slot=%d next=%d\n", index, slot, next)
-											break
-										}
-
-										nextEntry.lock.Lock()
-										nextMajority := nextEntry.acked >= nextEntry.majority
-										nextEntry.lock.Unlock()
-
-										if nextMajority {
-											fmt.Printf("Got next majority for node=%d slot=%d next=%d\n", index, slot, next)
-											CommitIndex = next
-											requestsIds = append(requestsIds, nextEntry.requestId)
-											etcdWrite(nextEntry.key, nextEntry.value)
-											if nextEntry.condition != nil {
-												fmt.Printf("Closing entry for node=%d slot=%d next=%d\n", index, slot, next)
-												close(nextEntry.condition)
-											}
-											node.Log.Lock.Lock()
-											delete(node.Log.Entries, next)
-											node.Log.Lock.Unlock()
-										} else {
-											fmt.Printf("Didn't get majority for node=%d slot=%d next=%d\n", index, slot, next)
-											break
-										}
-
+									if !nextEntryExists {
+										fmt.Printf("Does not exist for node=%d slot=%d next=%d\n", index, slot, next)
+										break
 									}
-									if start == CommitIndex {
-										fmt.Printf("Start is the same for node=%d slot=%d start=%d commitIndex=%d\n", index, slot, start, CommitIndex)
-										CommitLock.Unlock()
-									} else {
-										//fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
-										commitBuffer := make([]byte, 9+(4*len(requestsIds)))
-										commitBuffer[0] = OpCommit
-										binary.LittleEndian.PutUint32(commitBuffer[1:5], CommitIndex)
-										CommitLock.Unlock()
-										binary.LittleEndian.PutUint32(commitBuffer[5:9], uint32(len(requestsIds)))
-										for i, requestId := range requestsIds {
-											binary.LittleEndian.PutUint32(commitBuffer[9+(i*4):], requestId)
-										}
+									//
+									//nextEntry.lock.Lock()
+									//nextMajority := nextEntry.acked >= nextEntry.majority
+									//nextEntry.lock.Unlock()
 
-										fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
-										for i := 0; i < node.Total; i++ {
-											if i == node.Index {
-												continue
-											}
-											//client := node.Clients[i]
-											go func(index int, client Client) {
-												client.mutex.Lock()
-												err := client.Write(commitBuffer)
-												if err != nil {
-													panic("error writing!")
-												}
-												client.mutex.Unlock()
-											}(i, node.Clients[i])
+									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
+										fmt.Printf("Got next majority for node=%d slot=%d next=%d\n", index, slot, next)
+										CommitIndex = next
+										requestsIds = append(requestsIds, nextEntry.requestId)
+										etcdWrite(nextEntry.key, nextEntry.value)
+										if nextEntry.condition != nil {
+											fmt.Printf("Closing entry for node=%d slot=%d next=%d\n", index, slot, next)
+											close(nextEntry.condition)
 										}
+										node.Log.Lock.Lock()
+										delete(node.Log.Entries, next)
+										node.Log.Lock.Unlock()
+									} else {
+										fmt.Printf("Didn't get majority for node=%d slot=%d next=%d\n", index, slot, next)
+										break
+									}
+
+								}
+								if start == CommitIndex {
+									fmt.Printf("Start is the same for node=%d slot=%d start=%d commitIndex=%d\n", index, slot, start, CommitIndex)
+									CommitLock.Unlock()
+								} else {
+									//fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
+									commitBuffer := make([]byte, 9+(4*len(requestsIds)))
+									commitBuffer[0] = OpCommit
+									binary.LittleEndian.PutUint32(commitBuffer[1:5], CommitIndex)
+									CommitLock.Unlock()
+									binary.LittleEndian.PutUint32(commitBuffer[5:9], uint32(len(requestsIds)))
+									for i, requestId := range requestsIds {
+										binary.LittleEndian.PutUint32(commitBuffer[9+(i*4):], requestId)
+									}
+
+									fmt.Printf("Committing for node=%d slot=%d commitIndex=%d\n", index, slot, CommitIndex)
+									for i := 0; i < node.Total; i++ {
+										if i == node.Index {
+											continue
+										}
+										//client := node.Clients[i]
+										go func(index int, client Client) {
+											client.mutex.Lock()
+											err := client.Write(commitBuffer)
+											if err != nil {
+												panic("error writing!")
+											}
+											client.mutex.Unlock()
+										}(i, node.Clients[i])
 									}
 									//CommitLock.Unlock()
 								}
@@ -454,7 +446,6 @@ func (node *Node) Write(
 		acked:     1,
 		majority:  uint32(node.Quorum),
 		condition: make(chan struct{}),
-		lock:      &sync.Mutex{},
 		requestId: requestId,
 	}
 	node.Log.Lock.Lock()
