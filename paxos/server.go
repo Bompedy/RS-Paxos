@@ -7,7 +7,6 @@ import (
 	"github.com/klauspost/reedsolomon"
 	"math"
 	"net"
-	"runtime"
 	"sync"
 	"sync/atomic"
 )
@@ -214,6 +213,85 @@ func (node *Node) Accept(
 			}
 			index := uint32(indexBuffer[0])
 
+			commitChannel := make(chan CommitPacket)
+			//commitChannel <- commitPacket
+			go func() {
+				for commit := range commitChannel {
+					for {
+						current := CommitIndex + 1
+						if current > commit.Next {
+							break
+						}
+
+						fmt.Printf("Is someone stuck?: %d\n", current)
+
+						var entry Entry
+						// wait for it to get in our log i guess :3
+						for {
+							node.Log.Lock.Lock()
+							mapEntry, exists := node.Log.Entries[current]
+							delete(node.Log.Entries, current)
+							node.Log.Lock.Unlock()
+							if exists {
+								break
+							}
+							entry = *mapEntry
+						}
+						//
+						CommitIndex = current
+
+						//etcdWrite(entry.key, entry.value)
+						if entry.condition != nil {
+							close(entry.condition)
+						}
+
+						//CommitIndex = current
+
+						// leader - 6-10          uuids[0] uuids[1] uuids[2] uuids[3]
+						// follower - 6
+
+						// (7 - (10 - 4)) - 1
+
+						// current=4
+						//                  0           1           2
+						// next=7  requests[5] requests[6] requests[7]
+						// requestIds=3
+
+						// next - current = 4
+						// (4) - 3 - 1 = 0
+
+						//3 - 7 - 4 = 0
+						//3 - (7 - 5) = 1
+						//3 - (7 - 6) = 2
+
+						requestIndex := int32(len(commit.RequestIds)) - (int32(commit.Next) - int32(current))
+						//fmt.Printf("idx: %d\n", idx)
+
+						//requestIndex := (int32(current) - (int32(commit.Next) - int32(len(commit.RequestIds)))) - 1
+						if requestIndex >= 0 {
+							fmt.Printf("TAKE REQUEST LOCK %d\n!", current)
+							node.RequestLock.Lock()
+							channel, exists := node.RequestWaiter[commit.RequestIds[requestIndex]]
+							fmt.Printf("Request Lock size before: %d\n", len(node.RequestWaiter))
+							if exists {
+								if channel != nil {
+									fmt.Printf("Released channel: current=%d id=%s\n", current, commit.RequestIds[requestIndex].String())
+									close(channel)
+								}
+								delete(node.RequestWaiter, commit.RequestIds[requestIndex])
+							} else {
+								println("Didn't find request!")
+							}
+							fmt.Printf("Request Lock size: %d\n", len(node.RequestWaiter))
+							node.RequestLock.Unlock()
+							fmt.Printf("RELEASED REQUEST LOCK %d\n!.", current)
+						} else {
+							fmt.Printf("No requests current=%d next=%d totalIds=%d requestIndex=%d\n!.", current, commit.Next, len(commit.RequestIds), requestIndex)
+						}
+					}
+				}
+			}()
+
 			go func() {
 				sizeBuffer := make([]byte, 4)
 				buffer := make([]byte, 65535)
@@ -276,148 +354,69 @@ func (node *Node) Accept(
 						//}()
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
-						//go func() {
-						CommitLock.Lock()
-						node.Log.Lock.Lock()
-						entry, exists := node.Log.Entries[slot]
-						node.Log.Lock.Unlock()
+						go func() {
+							CommitLock.Lock()
+							node.Log.Lock.Lock()
+							entry, exists := node.Log.Entries[slot]
+							node.Log.Lock.Unlock()
 
-						fmt.Printf("grabbing lock: %d\n", slot)
-						//CommitLock.Lock()
-						if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
-							//fmt.Printf("Got enough acks for: %d\n", slot)
-							var requestsIds []uuid.UUID
-							//CommitLock.Lock()
-							//fmt.Printf("Aquired lock for: %d\n", slot)
-							start := CommitIndex
-							for {
-								next := CommitIndex + 1
-								fmt.Printf("looping then?: %d\n", slot)
+							if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
+								var requestsIds []uuid.UUID
+								start := CommitIndex
+								for {
+									next := CommitIndex + 1
 
-								node.Log.Lock.Lock()
-								nextEntry, nextEntryExists := node.Log.Entries[next]
-								node.Log.Lock.Unlock()
-
-								if !nextEntryExists {
-									break
-								}
-
-								if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
-									//fmt.Printf("got majority for: %d\n", next)
-									CommitIndex = next
-									requestsIds = append(requestsIds, nextEntry.requestId)
-									//etcdWrite(nextEntry.key, nextEntry.value)
-									if nextEntry.condition != nil {
-										close(nextEntry.condition)
-									}
 									node.Log.Lock.Lock()
-									delete(node.Log.Entries, next)
+									nextEntry, nextEntryExists := node.Log.Entries[next]
 									node.Log.Lock.Unlock()
-								} else {
-									break
-								}
-							}
 
-							if start == CommitIndex {
-								//fmt.Printf("It's the same: %d, %d\n", start, CommitIndex)
-								//CommitLock.Unlock()
-							} else {
-								packet := CommitPacket{
-									RequestIds: requestsIds,
-									Next:       CommitIndex,
-								}
-
-								//CommitLock.Unlock()
-
-								fmt.Printf("Commiting up to: %d\n", packet.Next)
-
-								for i := 0; i < node.Total; i++ {
-									if i == node.Index {
-										continue
+									if !nextEntryExists {
+										break
 									}
-									//go func(index int, client Client) {
-									node.Clients[i].WriteCommitPacket(packet)
-									//}(i, node.Clients[i])
+
+									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
+										CommitIndex = next
+										requestsIds = append(requestsIds, nextEntry.requestId)
+										//etcdWrite(nextEntry.key, nextEntry.value)
+										if nextEntry.condition != nil {
+											close(nextEntry.condition)
+										}
+										node.Log.Lock.Lock()
+										delete(node.Log.Entries, next)
+										node.Log.Lock.Unlock()
+									} else {
+										break
+									}
+								}
+
+								if start == CommitIndex {
+									//fmt.Printf("It's the same: %d, %d\n", start, CommitIndex)
+									//CommitLock.Unlock()
+								} else {
+									packet := CommitPacket{
+										RequestIds: requestsIds,
+										Next:       CommitIndex,
+									}
+
+									//CommitLock.Unlock()
+
+									fmt.Printf("Commiting up to: %d\n", packet.Next)
+
+									for i := 0; i < node.Total; i++ {
+										if i == node.Index {
+											continue
+										}
+										node.Clients[i].WriteCommitPacket(packet)
+									}
 								}
 							}
-
-							//fmt.Printf("Released lock for: %d\n", slot)
-						}
-						CommitLock.Unlock()
-						fmt.Printf("released lock: %d\n", slot)
-						//}()
+							CommitLock.Unlock()
+							fmt.Printf("released lock: %d\n", slot)
+						}()
 					} else if op == OpCommit {
 						commitPacket := GetCommitPacket(buffer[1:])
 						fmt.Printf("Commiting up to: %d\n", commitPacket.Next)
-
-						go func() {
-							fmt.Printf("spawned another goroutine: %d\n", commitPacket.Next)
-							fmt.Printf("Total gorouitnes: %d\n", runtime.NumGoroutine())
-							CommitLock.Lock()
-							//defer CommitLock.Unlock()
-							for {
-								current := CommitIndex + 1
-								if current > commitPacket.Next {
-									break
-								}
-
-								fmt.Printf("Is someone stuck?: %d\n", current)
-
-								//node.Log.Lock.Lock()
-								//entry, exists := node.Log.Entries[current]
-								//delete(node.Log.Entries, current)
-								//node.Log.Lock.Unlock()
-								////
-								////if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
-								////	continue
-								////}
-								//
-								//if !exists {
-								//	fmt.Printf("MAJOR PROBLEM: %d\n", current)
-								//	break
-								//	//panic("major problem")
-								//}
-								//
-								//CommitIndex = current
-								//
-								////etcdWrite(entry.key, entry.value)
-								//if entry.condition != nil {
-								//	close(entry.condition)
-								//}
-
-								CommitIndex = current
-
-								// leader - 6-10          uuids[0] uuids[1] uuids[2] uuids[3]
-								// follower - 6
-
-								// (7 - (10 - 4)) - 1
-
-								requestIndex := (int32(current) - (int32(commitPacket.Next) - int32(len(commitPacket.RequestIds)))) - 1
-								if requestIndex >= 0 {
-									fmt.Printf("TAKE REQUEST LOCK %d\n!", current)
-									node.RequestLock.Lock()
-									channel, exists := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
-									fmt.Printf("Request Lock size before: %d\n", len(node.RequestWaiter))
-									if exists {
-										if channel != nil {
-											fmt.Printf("Released channel: current=%d id=%s\n", current, commitPacket.RequestIds[requestIndex].String())
-											close(channel)
-										}
-										delete(node.RequestWaiter, commitPacket.RequestIds[requestIndex])
-									} else {
-										println("Didn't find request!")
-									}
-									fmt.Printf("Request Lock size: %d\n", len(node.RequestWaiter))
-									node.RequestLock.Unlock()
-									fmt.Printf("RELEASED REQUEST LOCK %d\n!.", current)
-								} else {
-									fmt.Printf("No requests current=%d next=%d totalIds=%d requestIndex=%d\n!.", current, commitPacket.Next, len(commitPacket.RequestIds), requestIndex)
-								}
-							}
-
-							fmt.Printf("Released lock: %d\n", CommitIndex)
-							CommitLock.Unlock()
-						}()
+						commitChannel <- commitPacket
 					}
 				}
 			}()
