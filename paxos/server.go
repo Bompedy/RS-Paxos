@@ -407,6 +407,7 @@ func (node *Node) ForwardWrite(
 	key []byte,
 	value []byte,
 ) {
+	fmt.Printf("Are we getting more? \n")
 	// create requestId
 	requestId := uuid.New()
 	if node.Index != node.Leader {
