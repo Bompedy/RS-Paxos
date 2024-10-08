@@ -298,7 +298,7 @@ func (node *Node) Accept(
 							if exists {
 								channel := value.(chan struct{})
 								if channel != nil {
-									//fmt.Printf("Released channel: current=%d id=%s\n", current, commit.RequestIds[requestIndex].String())
+									fmt.Printf("Released channel: current=%d id=%s\n", current, commit.RequestIds[requestIndex].String())
 									close(entry.condition)
 								}
 								node.RequestWaiter.Delete(commit.RequestIds[requestIndex])
