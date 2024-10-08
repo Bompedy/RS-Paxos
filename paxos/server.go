@@ -235,7 +235,7 @@ func (node *Node) Accept(
 								fmt.Printf("we are so stuck on %d\n", current)
 							}
 
-							time.Sleep(1000 * time.Millisecond)
+							time.Sleep(5000 * time.Millisecond)
 						}
 						//
 						CommitIndex = current
