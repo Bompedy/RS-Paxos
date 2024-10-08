@@ -351,6 +351,8 @@ func (node *Node) Accept(
 								close(entry.condition)
 							}
 
+							fmt.Printf("Which index did we get?: current=%d, next=%d, total=%d", int32(current), int32(next), int32(totalRequestIds))
+
 							requestIndex := int32(current) - (int32(next) - int32(totalRequestIds) - 1)
 							fmt.Printf("Request index: %d\n", requestIndex)
 							if requestIndex >= 0 {
