@@ -354,7 +354,7 @@ func (node *Node) Accept(
 						fmt.Printf("spawned another goroutine: %d\n", commitPacket.Next)
 						fmt.Printf("Total gorouitnes: %d\n", runtime.NumGoroutine())
 						CommitLock.Lock()
-						defer CommitLock.Unlock()
+						//defer CommitLock.Unlock()
 						for {
 							current := CommitIndex + 1
 							if current > commitPacket.Next {
@@ -414,7 +414,7 @@ func (node *Node) Accept(
 						}
 
 						fmt.Printf("Released lock: %d\n", CommitIndex)
-						//CommitLock.Unlock()
+						CommitLock.Unlock()
 						//}()
 					}
 				}
