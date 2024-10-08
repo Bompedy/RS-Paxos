@@ -311,6 +311,8 @@ func (node *Node) Accept(
 
 									CommitLock.Unlock()
 
+									fmt.Printf("Commiting up to: %d", packet.Next)
+
 									for i := 0; i < node.Total; i++ {
 										if i == node.Index {
 											continue
@@ -324,6 +326,7 @@ func (node *Node) Accept(
 						}()
 					} else if op == OpCommit {
 						commitPacket := GetCommitPacket(buffer[1:])
+						fmt.Printf("Commiting up to: %d", commitPacket.Next)
 
 						go func() {
 							CommitLock.Lock()
