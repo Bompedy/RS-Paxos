@@ -227,6 +227,7 @@ func (node *Node) Accept(
 					if err != nil {
 						panic(err)
 					}
+					fmt.Printf("Read bytes %d\n", buffer[0])
 
 					op := buffer[0]
 					if op == OpPropose {
