@@ -3,6 +3,7 @@ package paxos
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/klauspost/reedsolomon"
 	"math"
 	"net"
@@ -18,12 +19,11 @@ var OpAck = uint8(3)
 var CommitLock sync.Mutex
 var CommitIndex uint32
 var AppliedIndex uint32
-var RequestId uint32
 
 type Node struct {
 	Clients       []Client
 	RequestLock   *sync.Mutex
-	RequestWaiter map[uint32]chan struct{}
+	RequestWaiter map[uuid.UUID]chan struct{}
 	Total         int
 	Encoder       reedsolomon.Encoder
 	Log           Log
@@ -45,28 +45,30 @@ type Entry struct {
 	acked     uint32
 	majority  uint32
 	condition chan struct{}
-	requestId uint32
+	requestId uuid.UUID
 }
 
 type ProposePacket struct {
 	Slot      uint32
 	Key       []byte
 	Value     []byte
-	RequestId uint32
+	RequestId uuid.UUID
 }
 
 type CommitPacket struct {
-	RequestIds []uint32
+	RequestIds []uuid.UUID
 	Next       uint32
 }
 
 func GetProposePacket(buffer []byte) ProposePacket {
-	requestId := binary.LittleEndian.Uint32(buffer[:4])
-	keySize := binary.LittleEndian.Uint32(buffer[4:8])
-	valueSize := binary.LittleEndian.Uint32(buffer[8:12])
-	slot := binary.LittleEndian.Uint32(buffer[12:16])
-	keyEnd := 16 + keySize
-	keyStart := 16
+	//requestId := binary.LittleEndian.Uint32(buffer[:4])
+	var requestId uuid.UUID
+	copy(requestId[:], buffer[:16])
+	keySize := binary.LittleEndian.Uint32(buffer[16:20])
+	valueSize := binary.LittleEndian.Uint32(buffer[20:24])
+	slot := binary.LittleEndian.Uint32(buffer[24:28])
+	keyEnd := 28 + keySize
+	keyStart := 28
 	key := make([]byte, keySize)
 	value := make([]byte, valueSize)
 	copy(key, buffer[keyStart:keyEnd])
@@ -80,20 +82,20 @@ func GetProposePacket(buffer []byte) ProposePacket {
 }
 
 func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
-	size := 17 + len(packet.Key) + len(packet.Value)
+	size := 29 + len(packet.Key) + len(packet.Value)
 	buffer := make([]byte, size+4)
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
 	buffer[4] = op
 
 	//buffer[0] = OpForward
-	binary.LittleEndian.PutUint32(buffer[5:9], packet.RequestId)
-	binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(packet.Key)))
-	binary.LittleEndian.PutUint32(buffer[13:17], uint32(len(packet.Value)))
-	binary.LittleEndian.PutUint32(buffer[17:21], packet.Slot)
+	copy(buffer[5:21], packet.RequestId[:])
+	binary.LittleEndian.PutUint32(buffer[21:25], uint32(len(packet.Key)))
+	binary.LittleEndian.PutUint32(buffer[25:29], uint32(len(packet.Value)))
+	binary.LittleEndian.PutUint32(buffer[29:33], packet.Slot)
 	//binary.LittleEndian.PutUint32(buffer[9:13], requestId)
 	//var keyIndex = 13 + len(key)
-	var keyEnd = 21 + len(packet.Key)
-	copy(buffer[21:keyEnd], packet.Key)
+	var keyEnd = 33 + len(packet.Key)
+	copy(buffer[33:keyEnd], packet.Key)
 	copy(buffer[keyEnd:keyEnd+len(packet.Value)], packet.Value)
 	client.mutex.Lock()
 	err := client.Write(buffer)
@@ -104,14 +106,14 @@ func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
 }
 
 func (client Client) WriteCommitPacket(packet CommitPacket) {
-	size := 9 + (4 * len(packet.RequestIds))
+	size := 9 + (16 * len(packet.RequestIds))
 	buffer := make([]byte, size+4)
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
 	buffer[4] = OpCommit
 	binary.LittleEndian.PutUint32(buffer[5:9], packet.Next)
 	binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(packet.RequestIds)))
 	for i, requestId := range packet.RequestIds {
-		binary.LittleEndian.PutUint32(buffer[13+(i*4):], requestId)
+		copy(buffer[13+(i*16):], requestId[:])
 	}
 	client.mutex.Lock()
 	err := client.Write(buffer)
@@ -124,9 +126,9 @@ func (client Client) WriteCommitPacket(packet CommitPacket) {
 func GetCommitPacket(buffer []byte) CommitPacket {
 	next := binary.LittleEndian.Uint32(buffer[:4])
 	totalRequestIds := binary.LittleEndian.Uint32(buffer[4:8])
-	requestIds := make([]uint32, totalRequestIds)
+	requestIds := make([]uuid.UUID, totalRequestIds)
 	for i := uint32(0); i < totalRequestIds; i++ {
-		requestIds[i] = binary.LittleEndian.Uint32(buffer[8+(i*4) : 8+(i+1)*4])
+		copy(requestIds[i][:], buffer[8+(i*16):8+(i+16)*4])
 	}
 
 	return CommitPacket{
@@ -268,7 +270,7 @@ func (node *Node) Accept(
 							node.Log.Lock.Unlock()
 
 							if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
-								var requestsIds []uint32
+								var requestsIds []uuid.UUID
 								CommitLock.Lock()
 								start := CommitIndex
 								for {
@@ -385,7 +387,7 @@ func (node *Node) ForwardWrite(
 	value []byte,
 ) {
 	// create requestId
-	requestId := uint32(node.Index<<6 | int(atomic.AddUint32(&RequestId, 1)))
+	requestId := uuid.New()
 	if node.Index != node.Leader {
 		//println("Leader didnt get request forwarding!")
 		packet := ProposePacket{
@@ -415,7 +417,7 @@ func (node *Node) Write(
 	key []byte,
 	value []byte,
 	wait bool,
-	requestId uint32,
+	requestId uuid.UUID,
 ) {
 
 	var segmentSize = int(math.Ceil(float64(len(value)) / float64(node.Segments)))
