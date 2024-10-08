@@ -266,75 +266,75 @@ func (node *Node) Accept(
 						}()
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
-						go func() {
-							node.Log.Lock.Lock()
-							entry, exists := node.Log.Entries[slot]
-							node.Log.Lock.Unlock()
+						//go func() {
+						node.Log.Lock.Lock()
+						entry, exists := node.Log.Entries[slot]
+						node.Log.Lock.Unlock()
 
-							fmt.Printf("grabbing lock: %d\n", slot)
-							CommitLock.Lock()
-							if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
-								//fmt.Printf("Got enough acks for: %d\n", slot)
-								var requestsIds []uuid.UUID
-								//CommitLock.Lock()
-								//fmt.Printf("Aquired lock for: %d\n", slot)
-								start := CommitIndex
-								for {
-									next := CommitIndex + 1
-									fmt.Printf("looping then?: %d\n", slot)
+						fmt.Printf("grabbing lock: %d\n", slot)
+						CommitLock.Lock()
+						if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
+							//fmt.Printf("Got enough acks for: %d\n", slot)
+							var requestsIds []uuid.UUID
+							//CommitLock.Lock()
+							//fmt.Printf("Aquired lock for: %d\n", slot)
+							start := CommitIndex
+							for {
+								next := CommitIndex + 1
+								fmt.Printf("looping then?: %d\n", slot)
 
+								node.Log.Lock.Lock()
+								nextEntry, nextEntryExists := node.Log.Entries[next]
+								node.Log.Lock.Unlock()
+
+								if !nextEntryExists {
+									break
+								}
+
+								if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
+									//fmt.Printf("got majority for: %d\n", next)
+									CommitIndex = next
+									requestsIds = append(requestsIds, nextEntry.requestId)
+									etcdWrite(nextEntry.key, nextEntry.value)
+									if nextEntry.condition != nil {
+										close(nextEntry.condition)
+									}
 									node.Log.Lock.Lock()
-									nextEntry, nextEntryExists := node.Log.Entries[next]
+									delete(node.Log.Entries, next)
 									node.Log.Lock.Unlock()
-
-									if !nextEntryExists {
-										break
-									}
-
-									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
-										//fmt.Printf("got majority for: %d\n", next)
-										CommitIndex = next
-										requestsIds = append(requestsIds, nextEntry.requestId)
-										etcdWrite(nextEntry.key, nextEntry.value)
-										if nextEntry.condition != nil {
-											close(nextEntry.condition)
-										}
-										node.Log.Lock.Lock()
-										delete(node.Log.Entries, next)
-										node.Log.Lock.Unlock()
-									} else {
-										break
-									}
-								}
-
-								if start == CommitIndex {
-									//fmt.Printf("It's the same: %d, %d\n", start, CommitIndex)
-									//CommitLock.Unlock()
 								} else {
-									packet := CommitPacket{
-										RequestIds: requestsIds,
-										Next:       CommitIndex,
-									}
+									break
+								}
+							}
 
-									//CommitLock.Unlock()
-
-									fmt.Printf("Commiting up to: %d\n", packet.Next)
-
-									for i := 0; i < node.Total; i++ {
-										if i == node.Index {
-											continue
-										}
-										go func(index int, client Client) {
-											client.WriteCommitPacket(packet)
-										}(i, node.Clients[i])
-									}
+							if start == CommitIndex {
+								//fmt.Printf("It's the same: %d, %d\n", start, CommitIndex)
+								//CommitLock.Unlock()
+							} else {
+								packet := CommitPacket{
+									RequestIds: requestsIds,
+									Next:       CommitIndex,
 								}
 
-								//fmt.Printf("Released lock for: %d\n", slot)
+								//CommitLock.Unlock()
+
+								fmt.Printf("Commiting up to: %d\n", packet.Next)
+
+								for i := 0; i < node.Total; i++ {
+									if i == node.Index {
+										continue
+									}
+									go func(index int, client Client) {
+										client.WriteCommitPacket(packet)
+									}(i, node.Clients[i])
+								}
 							}
-							CommitLock.Unlock()
-							fmt.Printf("released lock: %d\n", slot)
-						}()
+
+							//fmt.Printf("Released lock for: %d\n", slot)
+						}
+						CommitLock.Unlock()
+						fmt.Printf("released lock: %d\n", slot)
+						//}()
 					} else if op == OpCommit {
 						commitPacket := GetCommitPacket(buffer[1:])
 						fmt.Printf("Commiting up to: %d\n", commitPacket.Next)
