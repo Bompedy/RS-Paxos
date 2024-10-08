@@ -376,7 +376,7 @@ func (node *Node) Accept(
 							entry := value.(*Entry)
 							//node.Log.Lock.Unlock()
 
-							acked := atomic.AddUint32(&entry.acked, 1)
+							//acked := atomic.AddUint32(&entry.acked, 1)
 
 							if exists && atomic.AddUint32(&entry.acked, 1) == entry.majority {
 								var requestsIds []uuid.UUID
