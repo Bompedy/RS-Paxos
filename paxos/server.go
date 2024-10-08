@@ -243,6 +243,7 @@ func (node *Node) Accept(
 						node.Log.Entries[proposal.Slot] = entry
 						node.Log.Lock.Unlock()
 
+						fmt.Printf("Got proposal\n")
 						go func() {
 							response := make([]byte, 9)
 							binary.LittleEndian.PutUint32(response[:4], 5)
@@ -257,6 +258,7 @@ func (node *Node) Accept(
 							}
 						}()
 					} else if op == OpForward {
+						fmt.Printf("Gonna forward packet\n")
 						forward := GetProposePacket(buffer[1:])
 						go func() {
 							node.Write(forward.Key, forward.Value, false, forward.RequestId)
