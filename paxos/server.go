@@ -311,7 +311,7 @@ func (node *Node) Accept(
 
 									CommitLock.Unlock()
 
-									fmt.Printf("Commiting up to: %d", packet.Next)
+									fmt.Printf("Commiting up to: %d\n", packet.Next)
 
 									for i := 0; i < node.Total; i++ {
 										if i == node.Index {
