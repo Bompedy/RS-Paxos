@@ -267,7 +267,7 @@ func (node *Node) Accept(
 							node.Write(forward.Key, forward.Value, false, forward.RequestId)
 						}()
 					} else if op == OpAck {
-						slot := binary.LittleEndian.Uint32(buffer[1:5])
+						slot := binary.LittleEndian.Uint32(buffer[1:])
 						fmt.Printf("\nGot ack from %d for %d\n", index, slot)
 						//go func() {
 						node.Log.Lock.Lock()
@@ -307,13 +307,12 @@ func (node *Node) Accept(
 									fmt.Printf("Didn't get majority for node=%d slot=%d next=%d\n", index, slot, next)
 									break
 								}
-
 							}
+
 							if start == CommitIndex {
 								fmt.Printf("Start is the same for node=%d slot=%d start=%d commitIndex=%d\n", index, slot, start, CommitIndex)
 								CommitLock.Unlock()
 							} else {
-
 								packet := CommitPacket{
 									RequestIds: requestsIds,
 									Next:       CommitIndex,
@@ -334,6 +333,7 @@ func (node *Node) Accept(
 						}
 						//}()
 					} else if op == OpCommit {
+						fmt.Printf("Got commit\n")
 						commitPacket := GetCommitPacket(buffer[1:])
 
 						//go func() {
