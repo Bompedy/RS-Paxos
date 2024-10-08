@@ -82,7 +82,7 @@ func GetProposePacket(buffer []byte) ProposePacket {
 func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
 	size := 17 + len(packet.Key) + len(packet.Value)
 	buffer := make([]byte, size+4)
-	fmt.Printf("Writing out proposal: %d\n", size)
+	fmt.Printf("Writing out proposal op=%d: %d\n", op, size)
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
 	buffer[5] = op
 
@@ -228,7 +228,7 @@ func (node *Node) Accept(
 					if err != nil {
 						panic(err)
 					}
-					fmt.Printf("Read bytes %d\n", buffer[0])
+					fmt.Printf("Read bytes buffer[0]=%d, buffer[1]=%d\n", buffer[0], buffer[1])
 
 					op := buffer[0]
 					if op == OpPropose {
