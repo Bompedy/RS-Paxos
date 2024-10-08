@@ -387,7 +387,7 @@ func (node *Node) ForwardWrite(
 	// create requestId
 	requestId := uint32(node.Index<<6 | int(atomic.AddUint32(&RequestId, 1)))
 	if node.Index != node.Leader {
-		println("Leader didnt get request forwarding!")
+		//println("Leader didnt get request forwarding!")
 		packet := ProposePacket{
 			Slot:      0,
 			RequestId: requestId,
@@ -404,7 +404,7 @@ func (node *Node) ForwardWrite(
 		}
 		node.RequestWaiter[requestId] = channel
 		node.RequestLock.Unlock()
-		println("Forwarded packet")
+		//println("Forwarded packet")
 		<-channel
 	} else {
 		node.Write(key, value, true, requestId)
