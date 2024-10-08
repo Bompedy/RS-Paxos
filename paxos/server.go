@@ -227,6 +227,7 @@ func (node *Node) Accept(
 								majority := entry.acked == entry.majority
 								entry.lock.Unlock()
 								if majority {
+									fmt.Printf("Got first majority for node=%d slot=%d\n", index, slot)
 									var requestsIds []uint32
 									CommitLock.Lock()
 									start := CommitIndex
