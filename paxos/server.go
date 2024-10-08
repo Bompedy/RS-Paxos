@@ -263,9 +263,10 @@ func (node *Node) Accept(
 						//}()
 					} else if op == OpForward {
 						forward := GetProposePacket(buffer[1:])
-						go func() {
-							node.Write(forward.Key, forward.Value, false, forward.RequestId)
-						}()
+						node.Write(forward.Key, forward.Value, false, forward.RequestId)
+						//go func() {
+						//	node.Write(forward.Key, forward.Value, false, forward.RequestId)
+						//}()
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
 						//go func() {
