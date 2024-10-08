@@ -245,6 +245,7 @@ func (node *Node) Accept(
 							requestId: proposal.RequestId,
 						}
 						//CommitLock.Lock()
+						// node 2
 						node.Log.Lock.Lock()
 						fmt.Printf("Putting entry in slot=%d\n", proposal.Slot)
 						node.Log.Entries[proposal.Slot] = entry
@@ -252,6 +253,7 @@ func (node *Node) Accept(
 						//CommitLock.Unlock()
 
 						//go func() {
+						// ack
 						response := make([]byte, 9)
 						binary.LittleEndian.PutUint32(response[:4], 5)
 						response[4] = OpAck
@@ -366,12 +368,14 @@ func (node *Node) Accept(
 							//if exists && !atomic.CompareAndSwapUint32(&CommitIndex, current-1, current) {
 							//	continue
 							//}
-							CommitIndex = current
 
 							if !exists {
 								fmt.Printf("MAJOR PROBLEM: %d\n", current)
+								break
 								panic("major problem")
 							}
+
+							CommitIndex = current
 
 							//etcdWrite(entry.key, entry.value)
 							if entry.condition != nil {
