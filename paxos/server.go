@@ -386,7 +386,7 @@ func (node *Node) Accept(
 										next := CommitIndex + 1
 
 										//node.Log.Lock.Lock()
-										nextValue, nextEntryExists := node.Log.Entries.Load(slot)
+										nextValue, nextEntryExists := node.Log.Entries.Load(next)
 										//nextEntry, nextEntryExists := node.Log.Entries[next]
 										//node.Log.Lock.Unlock()
 
