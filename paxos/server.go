@@ -253,6 +253,12 @@ func (node *Node) Accept(
 								close(channel)
 								node.RequestWaiter.Delete(commit.RequestIds[requestIndex])
 							}
+							var count int
+							node.RequestWaiter.Range(func(key, value interface{}) bool {
+								count++
+								return true // continue iterating
+							})
+							fmt.Printf("Request waiter size %d\n", count)
 						}
 					}
 				}
