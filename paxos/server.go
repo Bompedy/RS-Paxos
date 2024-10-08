@@ -442,7 +442,6 @@ func (node *Node) ForwardWrite(
 		}
 
 		fmt.Printf("Forwarding packet id=%s\n", requestId.String())
-		node.Clients[node.Leader].WriteProposePacket(packet, OpForward)
 		channel := make(chan struct{})
 		node.RequestLock.Lock()
 		_, exists := node.RequestWaiter[requestId]
@@ -451,6 +450,7 @@ func (node *Node) ForwardWrite(
 		}
 		node.RequestWaiter[requestId] = channel
 		node.RequestLock.Unlock()
+		node.Clients[node.Leader].WriteProposePacket(packet, OpForward)
 		//println("Forwarded packet")
 		//time.Sleep(2 * time.Second)
 		<-channel
