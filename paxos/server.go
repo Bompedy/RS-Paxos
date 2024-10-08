@@ -343,6 +343,7 @@ func (node *Node) Accept(
 						go func() {
 							CommitLock.Lock()
 							for {
+								fmt.Printf("Is someone stuck?: %d\n", commitPacket.Next)
 								current := CommitIndex + 1
 								if current > commitPacket.Next {
 									break
