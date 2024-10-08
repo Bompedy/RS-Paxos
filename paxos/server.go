@@ -369,6 +369,7 @@ func (node *Node) Accept(
 							CommitIndex = current
 
 							if !exists {
+								fmt.Printf("MAJOR PROBLEM: %d\n", current)
 								panic("major problem")
 							}
 
