@@ -288,6 +288,7 @@ func (node *Node) Accept(
 							condition: make(chan struct{}),
 							requestId: proposal.RequestId,
 						}
+						fmt.Printf("Got proposal for %d\n", proposal.Slot)
 						//fmt.Printf("Aquiring lock for %d\n", proposal.Slot)
 						////node.Log.Lock.Lock()
 						//fmt.Printf("Got lock for %d\n", proposal.Slot)
