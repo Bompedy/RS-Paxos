@@ -244,11 +244,12 @@ func (node *Node) Accept(
 							condition: make(chan struct{}),
 							requestId: proposal.RequestId,
 						}
-						CommitLock.Lock()
+						//CommitLock.Lock()
 						node.Log.Lock.Lock()
+						fmt.Printf("Putting entry in slot=%d\n", proposal.Slot)
 						node.Log.Entries[proposal.Slot] = entry
 						node.Log.Lock.Unlock()
-						CommitLock.Unlock()
+						//CommitLock.Unlock()
 
 						//go func() {
 						response := make([]byte, 9)
