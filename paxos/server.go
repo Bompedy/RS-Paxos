@@ -397,6 +397,7 @@ func (node *Node) Accept(
 									fmt.Printf("TAKE REQUEST LOCK %d\n!", current)
 									node.RequestLock.Lock()
 									channel, exists := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
+									fmt.Printf("Request Lock size before: %d\n", len(node.RequestWaiter))
 									if exists {
 										if channel != nil {
 											fmt.Printf("Released channel: current=%d id=%s\n", current, commitPacket.RequestIds[requestIndex].String())
