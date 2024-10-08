@@ -411,7 +411,7 @@ func (node *Node) Accept(
 									node.RequestLock.Unlock()
 									fmt.Printf("RELEASED REQUEST LOCK %d\n!.", current)
 								} else {
-									fmt.Printf("No requests %d\n!.", requestIndex)
+									fmt.Printf("No requests current=%d next=%d totalIds=%d requestIndex=%d\n!.", current, commitPacket.Next, commitPacket.RequestIds, requestIndex)
 								}
 							}
 
