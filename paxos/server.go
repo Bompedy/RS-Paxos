@@ -84,7 +84,7 @@ func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
 	buffer := make([]byte, size+4)
 	fmt.Printf("Writing out proposal op=%d: %d\n", op, size)
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
-	buffer[5] = op
+	buffer[4] = op
 
 	//buffer[0] = OpForward
 	binary.LittleEndian.PutUint32(buffer[5:9], packet.RequestId)
