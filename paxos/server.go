@@ -9,6 +9,7 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 var OpPropose = uint8(0)
@@ -237,6 +238,7 @@ func (node *Node) Accept(
 								node.Log.Lock.Unlock()
 								break
 							} else {
+								time.Sleep(5 * time.Second)
 								fmt.Printf("we are so stuck on %d\n", current)
 							}
 
