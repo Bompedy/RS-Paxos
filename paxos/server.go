@@ -325,6 +325,8 @@ func (node *Node) Accept(
 										}(i, node.Clients[i])
 									}
 								}
+
+								fmt.Printf("Released lock for: %d\n", slot)
 							}
 						}()
 					} else if op == OpCommit {
