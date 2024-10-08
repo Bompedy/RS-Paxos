@@ -230,6 +230,7 @@ func (node *Node) Accept(
 					op := buffer[0]
 					if op == OpPropose {
 						proposal := GetProposePacket(buffer[1:], true)
+						println("Got proposal packet!")
 						entry := &Entry{
 							key:       proposal.Key,
 							value:     proposal.Value,
