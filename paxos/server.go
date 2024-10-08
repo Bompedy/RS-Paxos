@@ -318,6 +318,7 @@ func (node *Node) Accept(
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
 						go func() {
+							fmt.Printf("Aquiring lock: %d\n", slot)
 							CommitLock.Lock()
 							//node.Log.Lock.Lock()
 							value, exists := node.Log.Entries.Load(slot)
@@ -326,6 +327,7 @@ func (node *Node) Accept(
 							//acked := atomic.AddUint32(&entry.acked, 1)
 
 							if exists {
+								fmt.Printf("Exists: %d\n", slot)
 								entry := value.(*Entry)
 								if atomic.AddUint32(&entry.acked, 1) == entry.majority {
 									var requestsIds []uuid.UUID
