@@ -270,6 +270,7 @@ func (node *Node) Accept(
 						// requests current=1 next=1 totalIds=1 requestIndex=1
 						// requests current=1 next=3 totalIds=3 requestIndex=3
 
+						// (3 - (3 - 1)) =
 						//len(3) -> 0, 1, 2
 
 						requestIndex := int32(len(commit.RequestIds)) - (int32(commit.Next) - int32(current)) - 1
@@ -304,7 +305,6 @@ func (node *Node) Accept(
 				sizeBuffer := make([]byte, 4)
 				buffer := make([]byte, 65535)
 				for {
-					fmt.Printf("Waiting for packet from %d\n", index)
 					err := reader.Read(sizeBuffer)
 					if err != nil {
 						panic(err)
@@ -319,8 +319,6 @@ func (node *Node) Accept(
 						panic(err)
 					}
 
-					fmt.Printf("Got packet from node=%d op=%d\n", index, buffer[0])
-
 					op := buffer[0]
 					if op == OpPropose {
 						proposal := GetProposePacket(buffer[1:])
@@ -332,34 +330,29 @@ func (node *Node) Accept(
 							condition: make(chan struct{}),
 							requestId: proposal.RequestId,
 						}
-						//CommitLock.Lock()
-						// node 2
 						node.Log.Lock.Lock()
-						fmt.Printf("Putting entry in slot=%d\n", proposal.Slot)
 						node.Log.Entries[proposal.Slot] = entry
 						node.Log.Lock.Unlock()
-						//CommitLock.Unlock()
 
-						//go func() {
-						// ack
-						response := make([]byte, 9)
-						binary.LittleEndian.PutUint32(response[:4], 5)
-						response[4] = OpAck
-						binary.LittleEndian.PutUint32(response[5:], proposal.Slot)
-						client := node.Clients[index]
-						client.mutex.Lock()
-						err = client.Write(response)
-						client.mutex.Unlock()
-						if err != nil {
-							panic(err)
-						}
-						//}()
+						go func() {
+							// ack
+							response := make([]byte, 9)
+							binary.LittleEndian.PutUint32(response[:4], 5)
+							response[4] = OpAck
+							binary.LittleEndian.PutUint32(response[5:], proposal.Slot)
+							client := node.Clients[index]
+							client.mutex.Lock()
+							err = client.Write(response)
+							client.mutex.Unlock()
+							if err != nil {
+								panic(err)
+							}
+						}()
 					} else if op == OpForward {
 						forward := GetProposePacket(buffer[1:])
-						node.Write(forward.Key, forward.Value, false, forward.RequestId)
-						//go func() {
-						//	node.Write(forward.Key, forward.Value, false, forward.RequestId)
-						//}()
+						go func() {
+							node.Write(forward.Key, forward.Value, false, forward.RequestId)
+						}()
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
 						go func() {
@@ -397,16 +390,11 @@ func (node *Node) Accept(
 									}
 								}
 
-								if start == CommitIndex {
-									//fmt.Printf("It's the same: %d, %d\n", start, CommitIndex)
-									//CommitLock.Unlock()
-								} else {
+								if start != CommitIndex {
 									packet := CommitPacket{
 										RequestIds: requestsIds,
 										Next:       CommitIndex,
 									}
-
-									//CommitLock.Unlock()
 
 									fmt.Printf("Commiting up to: %d\n", packet.Next)
 
@@ -419,7 +407,6 @@ func (node *Node) Accept(
 								}
 							}
 							CommitLock.Unlock()
-							fmt.Printf("released lock: %d\n", slot)
 						}()
 					} else if op == OpCommit {
 						commitPacket := GetCommitPacket(buffer[1:])
@@ -447,10 +434,8 @@ func (node *Node) ForwardWrite(
 	key []byte,
 	value []byte,
 ) {
-	// create requestId
 	requestId := uuid.New()
 	if node.Index != node.Leader {
-		//println("Leader didnt get request forwarding!")
 		packet := ProposePacket{
 			Slot:      0,
 			RequestId: requestId,
@@ -458,7 +443,6 @@ func (node *Node) ForwardWrite(
 			Value:     value,
 		}
 
-		fmt.Printf("Forwarding packet id=%s\n", requestId.String())
 		channel := make(chan struct{})
 		node.RequestLock.Lock()
 		_, exists := node.RequestWaiter[requestId]
@@ -468,10 +452,7 @@ func (node *Node) ForwardWrite(
 		node.RequestWaiter[requestId] = channel
 		node.RequestLock.Unlock()
 		node.Clients[node.Leader].WriteProposePacket(packet, OpForward)
-		//println("Forwarded packet")
-		//time.Sleep(2 * time.Second)
 		<-channel
-		fmt.Printf("Forwarded packet id=%s\n", requestId.String())
 	} else {
 		node.Write(key, value, true, requestId)
 	}
@@ -524,14 +505,15 @@ func (node *Node) Write(
 		if i == node.Index {
 			continue
 		}
-		//go func(index int, client Client) {
-		node.Clients[i].WriteProposePacket(ProposePacket{
-			Key:       key,
-			Value:     segments[i],
-			Slot:      appliedIndex,
-			RequestId: requestId,
-		}, OpPropose)
-		//}(i, node.Clients[i])
+		i := i
+		go func(index int, client Client) {
+			client.WriteProposePacket(ProposePacket{
+				Key:       key,
+				Value:     segments[i],
+				Slot:      appliedIndex,
+				RequestId: requestId,
+			}, OpPropose)
+		}(i, node.Clients[i])
 	}
 
 	if wait {
