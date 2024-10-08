@@ -60,7 +60,7 @@ type CommitPacket struct {
 	Next       uint32
 }
 
-func GetProposePacket(buffer []byte, hasSlot bool) ProposePacket {
+func GetProposePacket(buffer []byte) ProposePacket {
 	requestId := binary.LittleEndian.Uint32(buffer[:4])
 	keySize := binary.LittleEndian.Uint32(buffer[4:8])
 	valueSize := binary.LittleEndian.Uint32(buffer[8:12])
@@ -231,8 +231,9 @@ func (node *Node) Accept(
 
 					op := buffer[0]
 					if op == OpPropose {
-						proposal := GetProposePacket(buffer[1:], true)
-						println("Got proposal packet!")
+						proposal := GetProposePacket(buffer[1:])
+						fmt.Printf("Got proposal packet: %d\n", proposal.RequestId)
+						//println("Got proposal packet!")
 						entry := &Entry{
 							key:       proposal.Key,
 							value:     proposal.Value,
@@ -248,7 +249,7 @@ func (node *Node) Accept(
 						go func() {
 							response := make([]byte, 9)
 							binary.LittleEndian.PutUint32(response[:4], 5)
-							response[5] = OpAck
+							response[4] = OpAck
 							binary.LittleEndian.PutUint32(response[5:], proposal.Slot)
 							client := node.Clients[index]
 							client.mutex.Lock()
@@ -261,7 +262,7 @@ func (node *Node) Accept(
 						}()
 					} else if op == OpForward {
 						fmt.Printf("Got forward from: %d\n", index)
-						forward := GetProposePacket(buffer[1:], false)
+						forward := GetProposePacket(buffer[1:])
 						go func() {
 							node.Write(forward.Key, forward.Value, false, forward.RequestId)
 						}()
@@ -390,6 +391,8 @@ func (node *Node) Accept(
 
 						}()
 
+					} else {
+						println("GOT A RANDOM OP")
 					}
 				}
 			}()
