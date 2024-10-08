@@ -303,6 +303,7 @@ func (node *Node) Accept(
 								}
 
 								if start == CommitIndex {
+									fmt.Printf("It's the same: %d, %d\n", start, CommitIndex)
 									CommitLock.Unlock()
 								} else {
 									packet := CommitPacket{
