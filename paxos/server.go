@@ -290,6 +290,7 @@ func (node *Node) Accept(
 									}
 
 									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
+										fmt.Printf("got majority for: %d\n", next)
 										CommitIndex = next
 										requestsIds = append(requestsIds, nextEntry.requestId)
 										etcdWrite(nextEntry.key, nextEntry.value)
