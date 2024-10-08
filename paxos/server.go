@@ -409,6 +409,7 @@ func (node *Node) ForwardWrite(
 	key []byte,
 	value []byte,
 ) {
+	println("Forward to leader")
 	requestId := uuid.New()
 	if node.Index != node.Leader {
 		packet := ProposePacket{
