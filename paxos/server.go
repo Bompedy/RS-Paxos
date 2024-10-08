@@ -84,7 +84,7 @@ func GetProposePacket(buffer []byte) ProposePacket {
 }
 
 func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
-	println("Reading proposal")
+	//println("Reading proposal")
 	size := 29 + len(packet.Key) + len(packet.Value)
 	buffer := make([]byte, size+4)
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
@@ -106,7 +106,7 @@ func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
 		panic("error forwarding to leader!")
 	}
 	client.mutex.Unlock()
-	println("Done reading proposal")
+	//println("Done reading proposal")
 }
 
 func (client Client) WriteCommitPacket(packet CommitPacket) {
@@ -132,7 +132,7 @@ func GetCommitPacket(buffer []byte) CommitPacket {
 	totalRequestIds := binary.LittleEndian.Uint32(buffer[4:8])
 	requestIds := make([]uuid.UUID, totalRequestIds)
 	for i := uint32(0); i < totalRequestIds; i++ {
-		copy(requestIds[i][:], buffer[8+(i*16):8+(i+16)*4])
+		copy(requestIds[i][:], buffer[8+(i*16):8+(i*16)+16])
 	}
 
 	return CommitPacket{
