@@ -243,7 +243,7 @@ func (node *Node) Accept(
 								fmt.Printf("we are so stuck on %d\n", current)
 							}
 
-							channel.wait
+							//channel.wait
 
 							//node.Log.Lock.Unlock()
 							time.Sleep(10 * time.Millisecond) // give a little time so lock can be aquired
