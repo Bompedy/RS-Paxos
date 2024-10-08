@@ -61,7 +61,6 @@ type CommitPacket struct {
 }
 
 func GetProposePacket(buffer []byte) ProposePacket {
-	println("Getting proposal packet")
 	//requestId := binary.LittleEndian.Uint32(buffer[:4])
 	var requestId uuid.UUID
 	copy(requestId[:], buffer[:16])
@@ -74,7 +73,6 @@ func GetProposePacket(buffer []byte) ProposePacket {
 	value := make([]byte, valueSize)
 	copy(key, buffer[keyStart:keyEnd])
 	copy(value, buffer[keyEnd:keyEnd+valueSize])
-	println("got it")
 	return ProposePacket{
 		Slot:      slot,
 		Key:       key,
