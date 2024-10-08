@@ -515,14 +515,14 @@ func (node *Node) Write(
 			continue
 		}
 		i := i
-		//go func(index int, client Client) {
-		node.Clients[i].WriteProposePacket(ProposePacket{
-			Key:       key,
-			Value:     segments[i],
-			Slot:      appliedIndex,
-			RequestId: requestId,
-		}, OpPropose)
-		//}(i, node.Clients[i])
+		go func(index int, client Client) {
+			client.WriteProposePacket(ProposePacket{
+				Key:       key,
+				Value:     segments[i],
+				Slot:      appliedIndex,
+				RequestId: requestId,
+			}, OpPropose)
+		}(i, node.Clients[i])
 	}
 
 	if wait {
