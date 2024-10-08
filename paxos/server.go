@@ -228,6 +228,7 @@ func (node *Node) Accept(
 						var entry Entry
 						// wait for it to get in our log i guess :3
 						for {
+							fmt.Printf("grabbing lock?: %d\n", current)
 							node.Log.Lock.Lock()
 							mapEntry, exists := node.Log.Entries[current]
 							if exists {
@@ -240,6 +241,7 @@ func (node *Node) Accept(
 							}
 
 							node.Log.Lock.Unlock()
+							fmt.Printf("releasing lock?: %d\n", current)
 						}
 						//
 						CommitIndex = current
