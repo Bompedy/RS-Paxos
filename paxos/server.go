@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 var OpPropose = uint8(0)
@@ -434,6 +435,7 @@ func (node *Node) ForwardWrite(
 		node.RequestWaiter[requestId] = channel
 		node.RequestLock.Unlock()
 		//println("Forwarded packet")
+		time.Sleep(2 * time.Second)
 		<-channel
 		fmt.Printf("Forwarded packet index=%d id=%s\n", appliedIndex, requestId.String())
 	} else {
