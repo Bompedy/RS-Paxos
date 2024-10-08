@@ -404,6 +404,7 @@ func (node *Node) ForwardWrite(
 		}
 		node.RequestWaiter[requestId] = channel
 		node.RequestLock.Unlock()
+		println("Forwarded packet")
 		<-channel
 	} else {
 		node.Write(key, value, true, requestId)
