@@ -233,9 +233,9 @@ func (node *Node) Accept(
 							delete(node.Log.Entries, current)
 							node.Log.Lock.Unlock()
 							if exists {
+								entry = *mapEntry
 								break
 							}
-							entry = *mapEntry
 						}
 						//
 						CommitIndex = current
