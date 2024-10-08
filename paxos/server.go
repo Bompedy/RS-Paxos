@@ -444,8 +444,9 @@ func (node *Node) Write(
 	wait bool,
 	requestId uint32,
 ) {
+
 	var segmentSize = int(math.Ceil(float64(len(value)) / float64(node.Segments)))
-	fmt.Printf("Segment size: %d\n", segmentSize)
+	fmt.Printf("Segment size: value=%d segment=%d\n", len(value), segmentSize)
 	var segments = reedsolomon.AllocAligned(node.Segments+node.Parity, segmentSize)
 	var startIndex = 0
 	for i := range segments[:node.Segments] {
