@@ -244,9 +244,11 @@ func (node *Node) Accept(
 							condition: make(chan struct{}),
 							requestId: proposal.RequestId,
 						}
+						CommitLock.Lock()
 						node.Log.Lock.Lock()
 						node.Log.Entries[proposal.Slot] = entry
 						node.Log.Lock.Unlock()
+						CommitLock.Unlock()
 
 						//go func() {
 						response := make([]byte, 9)
