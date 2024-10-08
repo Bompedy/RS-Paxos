@@ -410,6 +410,8 @@ func (node *Node) Accept(
 									fmt.Printf("Request Lock size: %d\n", len(node.RequestWaiter))
 									node.RequestLock.Unlock()
 									fmt.Printf("RELEASED REQUEST LOCK %d\n!.", current)
+								} else {
+									fmt.Printf("No requests %d\n!.", requestIndex)
 								}
 							}
 
