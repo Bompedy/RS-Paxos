@@ -216,7 +216,7 @@ func (node *Node) Accept(
 			commitChannel := make(chan CommitPacket)
 			go func() {
 				for commit := range commitChannel {
-					println("Got commit!")
+					//println("Got commit!")
 					for {
 						current := CommitIndex + 1
 						if current > commit.Next {
@@ -296,7 +296,7 @@ func (node *Node) Accept(
 							condition: make(chan struct{}),
 							requestId: proposal.RequestId,
 						}
-						fmt.Printf("Got proposal for %d\n", proposal.Slot)
+						//fmt.Printf("Got proposal for %d\n", proposal.Slot)
 						//fmt.Printf("Aquiring lock for %d\n", proposal.Slot)
 						////node.Log.Lock.Lock()
 						//fmt.Printf("Got lock for %d\n", proposal.Slot)
@@ -326,7 +326,7 @@ func (node *Node) Accept(
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
 						go func() {
-							fmt.Printf("Aquiring lock: %d\n", slot)
+							//fmt.Printf("Aquiring lock: %d\n", slot)
 							CommitLock.Lock()
 							//node.Log.Lock.Lock()
 							value, exists := node.Log.Entries.Load(slot)
@@ -335,7 +335,7 @@ func (node *Node) Accept(
 							//acked := atomic.AddUint32(&entry.acked, 1)
 
 							if exists {
-								fmt.Printf("Exists: %d\n", slot)
+								//fmt.Printf("Exists: %d\n", slot)
 								entry := value.(*Entry)
 								if atomic.AddUint32(&entry.acked, 1) == entry.majority {
 									var requestsIds []uuid.UUID
@@ -377,7 +377,7 @@ func (node *Node) Accept(
 											Next:       CommitIndex,
 										}
 
-										fmt.Printf("Commiting up to: %d\n", packet.Next)
+										//fmt.Printf("Commiting up to: %d\n", packet.Next)
 
 										for i := 0; i < node.Total; i++ {
 											if i == node.Index {
@@ -388,7 +388,7 @@ func (node *Node) Accept(
 									}
 								}
 							}
-							fmt.Printf("Releasing lock: %d\n", slot)
+							//fmt.Printf("Releasing lock: %d\n", slot)
 							CommitLock.Unlock()
 						}()
 					} else if op == OpCommit {
@@ -419,7 +419,7 @@ func (node *Node) ForwardWrite(
 	key []byte,
 	value []byte,
 ) {
-	println("Forward to leader")
+	//println("Forward to leader")
 	requestId := uuid.New()
 	if node.Index != node.Leader {
 		packet := ProposePacket{
@@ -489,7 +489,7 @@ func (node *Node) Write(
 		}
 		i := i
 		go func(index int, client Client) {
-			fmt.Printf("Sending proposal %d to %d\n", appliedIndex, i)
+			//fmt.Printf("Sending proposal %d to %d\n", appliedIndex, i)
 			client.WriteProposePacket(ProposePacket{
 				Key:       key,
 				Value:     segments[i],
