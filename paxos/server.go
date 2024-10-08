@@ -225,7 +225,7 @@ func (node *Node) Accept(
 					}
 
 					fmt.Printf("Waiting for next read: %d\n", packetSize)
-					err = reader.Read(buffer)
+					err = reader.Read(buffer[:packetSize])
 					if err != nil {
 						panic(err)
 					}
