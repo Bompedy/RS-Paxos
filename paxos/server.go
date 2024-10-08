@@ -82,6 +82,7 @@ func GetProposePacket(buffer []byte) ProposePacket {
 }
 
 func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
+	println("Reading proposal")
 	size := 29 + len(packet.Key) + len(packet.Value)
 	buffer := make([]byte, size+4)
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
@@ -103,6 +104,7 @@ func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
 		panic("error forwarding to leader!")
 	}
 	client.mutex.Unlock()
+	println("Done reading proposal")
 }
 
 func (client Client) WriteCommitPacket(packet CommitPacket) {
