@@ -230,12 +230,14 @@ func (node *Node) Accept(
 						for {
 							node.Log.Lock.Lock()
 							mapEntry, exists := node.Log.Entries[current]
-							delete(node.Log.Entries, current)
-							node.Log.Lock.Unlock()
 							if exists {
 								entry = *mapEntry
+								delete(node.Log.Entries, current)
+								node.Log.Lock.Unlock()
 								break
 							}
+
+							node.Log.Lock.Unlock()
 						}
 						//
 						CommitIndex = current
