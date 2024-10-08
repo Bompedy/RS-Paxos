@@ -336,9 +336,9 @@ func (node *Node) Accept(
 							condition: make(chan struct{}),
 							requestId: proposal.RequestId,
 						}
-						fmt.Printf("Aquiring lock for %d\n", proposal.Slot)
+						//fmt.Printf("Aquiring lock for %d\n", proposal.Slot)
 						node.Log.Lock.Lock()
-						fmt.Printf("Got lock for %d\n", proposal.Slot)
+						//fmt.Printf("Got lock for %d\n", proposal.Slot)
 						node.Log.Entries[proposal.Slot] = entry
 						node.Log.Lock.Unlock()
 
