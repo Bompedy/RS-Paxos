@@ -228,7 +228,7 @@ func (node *Node) Accept(
 						var entry Entry
 						// wait for it to get in our log i guess :3
 						for {
-							fmt.Printf("grabbing lock?: %d\n", current)
+							//fmt.Printf("grabbing lock?: %d\n", current)
 							node.Log.Lock.Lock()
 							mapEntry, exists := node.Log.Entries[current]
 							if exists {
@@ -241,7 +241,7 @@ func (node *Node) Accept(
 							}
 
 							node.Log.Lock.Unlock()
-							fmt.Printf("releasing lock?: %d\n", current)
+							//fmt.Printf("releasing lock?: %d\n", current)
 						}
 						//
 						CommitIndex = current
@@ -336,9 +336,9 @@ func (node *Node) Accept(
 							condition: make(chan struct{}),
 							requestId: proposal.RequestId,
 						}
-						//fmt.Printf("Aquiring lock for %d\n", proposal.Slot)
+						fmt.Printf("Aquiring lock for %d\n", proposal.Slot)
 						node.Log.Lock.Lock()
-						//fmt.Printf("Got lock for %d\n", proposal.Slot)
+						fmt.Printf("Got lock for %d\n", proposal.Slot)
 						node.Log.Entries[proposal.Slot] = entry
 						node.Log.Lock.Unlock()
 
