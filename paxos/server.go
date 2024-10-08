@@ -24,7 +24,7 @@ var AppliedIndex uint32
 type Node struct {
 	Clients       []Client
 	RequestLock   *sync.Mutex
-	RequestWaiter map[uuid.UUID]chan struct{}
+	RequestWaiter sync.Map
 	Total         int
 	Encoder       reedsolomon.Encoder
 	Log           Log
@@ -243,6 +243,8 @@ func (node *Node) Accept(
 								fmt.Printf("we are so stuck on %d\n", current)
 							}
 
+							channel.wait
+
 							//node.Log.Lock.Unlock()
 							time.Sleep(10 * time.Millisecond) // give a little time so lock can be aquired
 							//fmt.Printf("releasing lock?: %d\n", current)
@@ -284,26 +286,28 @@ func (node *Node) Accept(
 						//len(3) -> 0, 1, 2
 
 						requestIndex := int32(len(commit.RequestIds)) - (int32(commit.Next) - int32(current)) - 1
-						fmt.Printf("requests current=%d next=%d totalIds=%d requestIndex=%d\n!.", current, commit.Next, len(commit.RequestIds), requestIndex)
+						//fmt.Printf("requests current=%d next=%d totalIds=%d requestIndex=%d\n!.", current, commit.Next, len(commit.RequestIds), requestIndex)
 
 						//requestIndex := (int32(current) - (int32(commit.Next) - int32(len(commit.RequestIds)))) - 1
 						if requestIndex >= 0 {
-							fmt.Printf("TAKE REQUEST LOCK %d\n!", current)
-							node.RequestLock.Lock()
-							channel, exists := node.RequestWaiter[commit.RequestIds[requestIndex]]
-							fmt.Printf("Request Lock size before: %d\n", len(node.RequestWaiter))
+							//fmt.Printf("TAKE REQUEST LOCK %d\n!", current)
+							//node.RequestLock.Lock()
+							value, exists := node.RequestWaiter.Load(commit.RequestIds[requestIndex])
+							//channel, exists := node.RequestWaiter[commit.RequestIds[requestIndex]]
+							//fmt.Printf("Request Lock size before: %d\n", len(node.RequestWaiter))
 							if exists {
+								channel := value.(chan struct{})
 								if channel != nil {
-									fmt.Printf("Released channel: current=%d id=%s\n", current, commit.RequestIds[requestIndex].String())
-									close(channel)
+									//fmt.Printf("Released channel: current=%d id=%s\n", current, commit.RequestIds[requestIndex].String())
+									close(entry.condition)
 								}
-								delete(node.RequestWaiter, commit.RequestIds[requestIndex])
+								node.RequestWaiter.Delete(commit.RequestIds[requestIndex])
 							} else {
 								println("Didn't find request!")
 							}
-							fmt.Printf("Request Lock size: %d\n", len(node.RequestWaiter))
-							node.RequestLock.Unlock()
-							fmt.Printf("RELEASED REQUEST LOCK %d\n!.", current)
+							//fmt.Printf("Request Lock size: %d\n", len(node.RequestWaiter))
+							//node.RequestLock.Unlock()
+							//fmt.Printf("RELEASED REQUEST LOCK %d\n!.", current)
 						} else {
 							fmt.Printf("No requests current=%d next=%d totalIds=%d requestIndex=%d\n!.", current, commit.Next, len(commit.RequestIds), requestIndex)
 						}
@@ -468,13 +472,7 @@ func (node *Node) ForwardWrite(
 		}
 
 		channel := make(chan struct{})
-		node.RequestLock.Lock()
-		_, exists := node.RequestWaiter[requestId]
-		if exists {
-			println("IT ALREADY EXISTS IN THERE AND WE ARE OVERWRITING IT")
-		}
-		node.RequestWaiter[requestId] = channel
-		node.RequestLock.Unlock()
+		node.RequestWaiter.Store(requestId, channel)
 		node.Clients[node.Leader].WriteProposePacket(packet, OpForward)
 		<-channel
 	} else {
