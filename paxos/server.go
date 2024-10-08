@@ -238,11 +238,12 @@ func (node *Node) Accept(
 								node.Log.Lock.Unlock()
 								break
 							} else {
-								time.Sleep(5 * time.Second)
+								//time.Sleep(5 * time.Second)
 								fmt.Printf("we are so stuck on %d\n", current)
 							}
 
 							node.Log.Lock.Unlock()
+							time.Sleep(5 * time.Second)
 							//fmt.Printf("releasing lock?: %d\n", current)
 						}
 						//
