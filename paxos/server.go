@@ -407,7 +407,8 @@ func (node *Node) ForwardWrite(
 	key []byte,
 	value []byte,
 ) {
-	fmt.Printf("Are we getting more? \n")
+	appliedIndex := atomic.AddUint32(&AppliedIndex, 1)
+	fmt.Printf("Are we getting more %d? \n", appliedIndex)
 	// create requestId
 	requestId := uuid.New()
 	if node.Index != node.Leader {
@@ -419,7 +420,7 @@ func (node *Node) ForwardWrite(
 			Value:     value,
 		}
 
-		fmt.Printf("Forwarding packet %s\n", requestId.String())
+		fmt.Printf("Forwarding packet index=%d id=%s\n", appliedIndex, requestId.String())
 		node.Clients[node.Leader].WriteProposePacket(packet, OpForward)
 		channel := make(chan struct{})
 		node.RequestLock.Lock()
@@ -431,7 +432,7 @@ func (node *Node) ForwardWrite(
 		node.RequestLock.Unlock()
 		//println("Forwarded packet")
 		<-channel
-		fmt.Printf("Forwarded packet %s\n", requestId.String())
+		fmt.Printf("Forwarded packet index=%d id=%s\n", appliedIndex, requestId.String())
 	} else {
 		node.Write(key, value, true, requestId)
 	}
