@@ -374,7 +374,7 @@ func (node *Node) Accept(
 									node.RequestLock.Lock()
 									channel := node.RequestWaiter[commitPacket.RequestIds[requestIndex]]
 									if channel != nil {
-										fmt.Printf("Released channel: %d\n", current)
+										fmt.Printf("Released channel: current=%d id=%s\n", current, commitPacket.RequestIds[requestIndex].String())
 										close(channel)
 									}
 									delete(node.RequestWaiter, commitPacket.RequestIds[requestIndex])
@@ -417,7 +417,7 @@ func (node *Node) ForwardWrite(
 			Value:     value,
 		}
 
-		fmt.Printf("Forwarding packet!\n")
+		fmt.Printf("Forwarding packet %s\n", requestId.String())
 		node.Clients[node.Leader].WriteProposePacket(packet, OpForward)
 		channel := make(chan struct{})
 		node.RequestLock.Lock()
@@ -427,10 +427,9 @@ func (node *Node) ForwardWrite(
 		}
 		node.RequestWaiter[requestId] = channel
 		node.RequestLock.Unlock()
-		fmt.Printf("Forwarded packet!\n")
 		//println("Forwarded packet")
 		<-channel
-		fmt.Printf("Forwarded packet!\n")
+		fmt.Printf("Forwarded packet %s\n", requestId.String())
 	} else {
 		node.Write(key, value, true, requestId)
 	}
