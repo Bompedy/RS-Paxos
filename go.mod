@@ -3,7 +3,7 @@ module github.com/Bompedy/RS-Paxos
 go 1.19
 
 require (
-	github.com/google/uuid v1.6.0
+	github.com/google/uuid v1.3.0
 	github.com/klauspost/reedsolomon v1.12.0
 )
 
