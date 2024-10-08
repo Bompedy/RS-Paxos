@@ -264,12 +264,15 @@ func (node *Node) Accept(
 						//3 - (7 - 5) = 1
 						//3 - (7 - 6) = 2
 
-						//1 - (7-6) = 0
-						// 1 - (7-7) = 1
+						//1 - (7-6) - 1 = -1
+						// 1 - (7-7) - 1 = 0
+
+						// requests current=1 next=1 totalIds=1 requestIndex=1
+						// requests current=1 next=3 totalIds=3 requestIndex=3
 
 						//len(3) -> 0, 1, 2
 
-						requestIndex := int32(len(commit.RequestIds)) - (int32(commit.Next) - int32(current))
+						requestIndex := int32(len(commit.RequestIds)) - (int32(commit.Next) - int32(current)) - 1
 						fmt.Printf("requests current=%d next=%d totalIds=%d requestIndex=%d\n!.", current, commit.Next, len(commit.RequestIds), requestIndex)
 
 						//requestIndex := (int32(current) - (int32(commit.Next) - int32(len(commit.RequestIds)))) - 1
