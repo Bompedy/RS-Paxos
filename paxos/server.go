@@ -26,16 +26,12 @@ type Node struct {
 	RequestIds    sync.Map
 	Total         int
 	Encoder       reedsolomon.Encoder
-	Log           Log
+	Entries       sync.Map
 	Quorum        int
 	Parity        int
 	Segments      int
 	Index         int
 	Leader        int
-}
-
-type Log struct {
-	Entries sync.Map
 }
 
 type Entry struct {
@@ -213,10 +209,10 @@ func (node *Node) Accept(
 						}
 						var entry Entry
 						for {
-							value, exists := node.Log.Entries.Load(current)
+							value, exists := node.Entries.Load(current)
 							if exists {
 								entry = *(value.(*Entry))
-								node.Log.Entries.Delete(current)
+								node.Entries.Delete(current)
 								break
 							} else {
 								//time.Sleep(5 * time.Second)
@@ -286,7 +282,7 @@ func (node *Node) Accept(
 						////node.Log.Lock.Lock()
 						//fmt.Printf("Got lock for %d\n", proposal.Slot)
 						node.RequestIds.Store(proposal.Slot, entry.requestId)
-						node.Log.Entries.Store(proposal.Slot, entry)
+						node.Entries.Store(proposal.Slot, entry)
 						//node.Log.Entries[proposal.Slot] = entry
 						//node.Log.Lock.Unlock()
 
@@ -315,7 +311,7 @@ func (node *Node) Accept(
 							//fmt.Printf("Aquiring lock: %d\n", slot)
 							CommitLock.Lock()
 							//node.Log.Lock.Lock()
-							value, exists := node.Log.Entries.Load(slot)
+							value, exists := node.Entries.Load(slot)
 							//node.Log.Lock.Unlock()
 
 							//acked := atomic.AddUint32(&entry.acked, 1)
@@ -328,7 +324,7 @@ func (node *Node) Accept(
 									start := CommitIndex
 									for {
 										next := CommitIndex + 1
-										nextValue, nextEntryExists := node.Log.Entries.Load(next)
+										nextValue, nextEntryExists := node.Entries.Load(next)
 										if !nextEntryExists {
 											break
 										}
@@ -341,7 +337,7 @@ func (node *Node) Accept(
 											if nextEntry.condition != nil {
 												close(nextEntry.condition)
 											}
-											node.Log.Entries.Delete(next)
+											node.Entries.Delete(next)
 										} else {
 											break
 										}
@@ -459,7 +455,7 @@ func (node *Node) Write(
 		condition: make(chan struct{}),
 		requestId: requestId,
 	}
-	node.Log.Entries.Store(appliedIndex, entry)
+	node.Entries.Store(appliedIndex, entry)
 	//
 	//node.Log.Lock.Lock()
 	//node.Log.Entries[appliedIndex] = entry
