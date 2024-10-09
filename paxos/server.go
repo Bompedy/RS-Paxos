@@ -340,7 +340,7 @@ func (node *Node) Accept(
 						}()
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
-						fmt.Printf("Got ack for slot=%d node=%d\n", slot, index)
+						//fmt.Printf("Got ack for slot=%d node=%d\n", slot, index)
 						go func() {
 							value, exists := node.Entries.Load(slot)
 
@@ -365,7 +365,7 @@ func (node *Node) Accept(
 											}
 
 											if nextEntry.Type == ReadType {
-												fmt.Printf("Got a read type slot=%d id=%s\n", next, nextEntry.requestId)
+												//fmt.Printf("Got a read type slot=%d id=%s\n", next, nextEntry.requestId)
 												bytes := etcdRead(nextEntry.key)
 												senderValue, senderExists := node.ReadSenders.Load(nextEntry.requestId)
 												waiterValue, waiterExists := node.ReadRequestWaiter.LoadAndDelete(nextEntry.requestId)
@@ -376,7 +376,7 @@ func (node *Node) Accept(
 														channel <- bytes
 														close(channel)
 													} else {
-														fmt.Printf("Writing read packet to %d\n", senderIndex)
+														//fmt.Printf("Writing read packet to %d\n", senderIndex)
 														node.Clients[senderIndex].WriteReadPacket(bytes, nextEntry.requestId)
 													}
 												} else {
