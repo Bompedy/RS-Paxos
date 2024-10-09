@@ -377,6 +377,7 @@ func (node *Node) Accept(
 														close(channel)
 													} else {
 														//fmt.Printf("Writing read packet to %d\n", senderIndex)
+														fmt.Printf("size of bytes in read packet: %d\n", len(bytes))
 														node.Clients[senderIndex].WriteReadPacket(bytes, nextEntry.requestId)
 													}
 												} else {
@@ -429,11 +430,15 @@ func (node *Node) Accept(
 						commitChannel <- slot
 					} else if op == OpRead {
 						var requestId uuid.UUID
-						value := make([]byte, packetSize-17)
-						copy(requestId[:], buffer[1:17])
-						copy(value, buffer[17:packetSize-17])
-						fmt.Printf("Got read packet size=%d %s\n", len(value), requestId.String())
-						readChannel <- ReadResult{requestId: requestId, value: value}
+						if packetSize == 17 {
+							readChannel <- ReadResult{requestId: requestId, value: make([]byte, 0)}
+						} else {
+							value := make([]byte, packetSize-17)
+							copy(requestId[:], buffer[1:17])
+							copy(value, buffer[17:packetSize-17])
+							fmt.Printf("Got read packet size=%d %s\n", len(value), requestId.String())
+							readChannel <- ReadResult{requestId: requestId, value: value}
+						}
 					}
 				}
 			}()
