@@ -297,7 +297,6 @@ func (node *Node) Accept(
 
 					op := buffer[0]
 					if op == OpPropose {
-						println("got proposals")
 						proposal := GetProposePacket(buffer[1:])
 						entry := &Entry{
 							key:       proposal.Key,
@@ -557,7 +556,6 @@ func (node *Node) Write(
 	}
 
 	appliedIndex := atomic.AddUint32(&AppliedIndex, 1)
-	//fmt.Printf("Got forward: %d\n", appliedIndex)
 	entry := &Entry{
 		key:       key,
 		value:     value,
@@ -569,10 +567,6 @@ func (node *Node) Write(
 	node.Entries.Store(appliedIndex, entry)
 	channel := make(chan struct{})
 	node.WriteRequestWaiter.Store(requestId, channel)
-	//
-	//node.Log.Lock.Lock()
-	//node.Log.Entries[appliedIndex] = entry
-	//node.Log.Lock.Unlock()
 
 	for i := 0; i < node.Total; i++ {
 		if i == node.Index {
@@ -580,7 +574,6 @@ func (node *Node) Write(
 		}
 		i := i
 		go func(index int, client Client) {
-			fmt.Printf("Sending proposal %d to %d\n", appliedIndex, i)
 			client.WriteProposePacket(ProposePacket{
 				Key:       key,
 				Value:     segments[i],
