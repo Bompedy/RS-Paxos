@@ -363,6 +363,7 @@ func (node *Node) Accept(
 											}
 
 											if nextEntry.Type == ReadType {
+												fmt.Printf("Got a read type slot=%d id=%s\n", next, nextEntry.requestId)
 												bytes := etcdRead(nextEntry.key)
 												senderValue, senderExists := node.ReadSenders.Load(nextEntry.requestId)
 												waiterValue, waiterExists := node.ReadRequestWaiter.LoadAndDelete(nextEntry.requestId)
@@ -496,7 +497,7 @@ func (node *Node) Read(
 	}
 
 	if wait {
-		fmt.Printf("Waiting on read for %d\n", requestId)
+		fmt.Printf("Waiting on read for %s\n", requestId.String())
 		return <-channel
 	}
 
