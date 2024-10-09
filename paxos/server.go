@@ -315,7 +315,6 @@ func (node *Node) Accept(
 
 											fmt.Printf("Set commit index to %d\n", next)
 
-											next += 1
 											//CommitIndex = next
 											//etcdWrite(nextEntry.key, nextEntry.value)
 											waiterValue, waiterExists := node.RequestWaiter.LoadAndDelete(nextEntry.requestId)
@@ -327,6 +326,7 @@ func (node *Node) Accept(
 											}
 
 											node.Entries.Delete(next)
+											next += 1
 										} else {
 											break
 										}
