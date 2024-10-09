@@ -277,7 +277,7 @@ func (node *Node) Accept(
 						}()
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
-						fmt.Printf("Got ack for %d\n", slot)
+						//fmt.Printf("Got ack for %d\n", slot)
 						go func() {
 							//CommitLock.Lock()
 							value, exists := node.Entries.Load(slot)
