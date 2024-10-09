@@ -212,7 +212,7 @@ func (node *Node) Accept(
 						}
 						node.RequestWaiter.Delete(current)
 
-						requestId = *(value.(*uuid.UUID))
+						requestId = value.(uuid.UUID)
 						waiterValue, exists := node.RequestWaiter.Load(requestId)
 						if exists {
 							channel := value.(chan struct{})
