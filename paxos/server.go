@@ -323,7 +323,7 @@ func (node *Node) Accept(
 									if start != CommitIndex {
 										fmt.Printf("Committing up to %d\n", CommitIndex)
 										commitBuffer := make([]byte, 9)
-										binary.LittleEndian.PutUint32(buffer[:4], 5)
+										binary.LittleEndian.PutUint32(commitBuffer[:4], 5)
 										commitBuffer[4] = OpCommit
 										binary.LittleEndian.PutUint32(commitBuffer[5:9], CommitIndex)
 
@@ -333,7 +333,7 @@ func (node *Node) Accept(
 											}
 											client := node.Clients[i]
 											client.mutex.Lock()
-											err := client.Write(buffer)
+											err := client.Write(commitBuffer)
 											if err != nil {
 												panic("error forwarding to leader!")
 											}
