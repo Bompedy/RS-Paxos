@@ -431,7 +431,7 @@ func (node *Node) Accept(
 						value := make([]byte, packetSize-17)
 						copy(buffer[1:17], requestId[:])
 						copy(value, buffer[17:packetSize-17])
-						println("We got a read for some reason?")
+						fmt.Printf("Got read packet %s\n", requestId.String())
 						readChannel <- ReadResult{requestId: requestId, value: value}
 					}
 				}
@@ -447,6 +447,7 @@ func (node *Node) ForwardRead(
 	if node.Index != node.Leader {
 		channel := make(chan []byte)
 		node.ReadRequestWaiter.Store(requestId, channel)
+		fmt.Printf("Forwarding %s\n", requestId.String())
 		packet := ProposePacket{
 			Slot:      0,
 			RequestId: requestId,
