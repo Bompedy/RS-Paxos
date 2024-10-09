@@ -375,6 +375,7 @@ func (node *Node) Accept(
 														channel <- bytes
 														close(channel)
 													} else {
+														fmt.Printf("Writing read packet to %d\n", senderIndex)
 														node.Clients[senderIndex].WriteReadPacket(bytes, nextEntry.requestId)
 													}
 												} else {
