@@ -9,7 +9,6 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 var OpPropose = uint8(0)
@@ -214,58 +213,64 @@ func (node *Node) Accept(
 			}
 			index := uint32(indexBuffer[0])
 
-			commitChannel := make(chan CommitPacket)
+			commitChannel := make(chan CommitPacket, 1000)
+			var commitChannelLock sync.Mutex
+
 			go func() {
-				for commit := range commitChannel {
+				for packet := range commitChannel {
 					//println("Got commit!")
-					for {
-						current := CommitIndex + 1
-
-						if current > commit.Next {
-							break
-						}
-
-						var entry Entry
+					go func(commit CommitPacket) {
 						for {
-							value, exists := node.Log.Entries.Load(current)
-							if exists {
-								entry = *(value.(*Entry))
-								node.Log.Entries.Delete(current)
+							current := CommitIndex + 1
+
+							if current > commit.Next {
 								break
+							}
+
+							var entry Entry
+							for {
+								value, exists := node.Log.Entries.Load(current)
+								if exists {
+									entry = *(value.(*Entry))
+									node.Log.Entries.Delete(current)
+									break
+								} else {
+									//time.Sleep(5 * time.Second)
+									fmt.Printf("we are so stuck on %d\n", current)
+								}
+
+								//time.Sleep(5000 * time.Millisecond)
+							}
+							//
+							CommitIndex = current
+
+							if entry.condition != nil {
+								close(entry.condition)
+							}
+
+							requestIndex := int32(len(commit.RequestIds)) - (int32(commit.Next) - int32(current)) - 1
+							fmt.Printf("request index requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
+
+							if requestIndex >= 0 {
+								value, exists := node.RequestWaiter.Load(commit.RequestIds[requestIndex])
+								if exists {
+									channel := value.(chan struct{})
+									close(channel)
+									node.RequestWaiter.Delete(commit.RequestIds[requestIndex])
+								}
+								var count int
+								node.RequestWaiter.Range(func(key, value interface{}) bool {
+									count++
+									return true // continue iterating
+								})
+								//fmt.Printf("Request waiter size %d\n", count)
 							} else {
-								//time.Sleep(5 * time.Second)
-								fmt.Printf("we are so stuck on %d\n", current)
+								//fmt.Printf("request index too large requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
 							}
-
-							//time.Sleep(5000 * time.Millisecond)
-						}
-						//
-						CommitIndex = current
-
-						if entry.condition != nil {
-							close(entry.condition)
 						}
 
-						requestIndex := int32(len(commit.RequestIds)) - (int32(commit.Next) - int32(current)) - 1
-						fmt.Printf("request index requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
-
-						if requestIndex >= 0 {
-							value, exists := node.RequestWaiter.Load(commit.RequestIds[requestIndex])
-							if exists {
-								channel := value.(chan struct{})
-								close(channel)
-								node.RequestWaiter.Delete(commit.RequestIds[requestIndex])
-							}
-							var count int
-							node.RequestWaiter.Range(func(key, value interface{}) bool {
-								count++
-								return true // continue iterating
-							})
-							//fmt.Printf("Request waiter size %d\n", count)
-						} else {
-							//fmt.Printf("request index too large requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
-						}
-					}
+						commitChannelLock.Unlock()
+					}(packet)
 				}
 			}()
 
@@ -307,20 +312,20 @@ func (node *Node) Accept(
 						//node.Log.Entries[proposal.Slot] = entry
 						//node.Log.Lock.Unlock()
 
-						go func() {
-							// ack
-							response := make([]byte, 9)
-							binary.LittleEndian.PutUint32(response[:4], 5)
-							response[4] = OpAck
-							binary.LittleEndian.PutUint32(response[5:], proposal.Slot)
-							client := node.Clients[index]
-							client.mutex.Lock()
-							err = client.Write(response)
-							client.mutex.Unlock()
-							if err != nil {
-								panic(err)
-							}
-						}()
+						//go func() {
+						// ack
+						response := make([]byte, 9)
+						binary.LittleEndian.PutUint32(response[:4], 5)
+						response[4] = OpAck
+						binary.LittleEndian.PutUint32(response[5:], proposal.Slot)
+						client := node.Clients[index]
+						client.mutex.Lock()
+						err = client.Write(response)
+						client.mutex.Unlock()
+						if err != nil {
+							panic(err)
+						}
+						//}()
 					} else if op == OpForward {
 						forward := GetProposePacket(buffer[1:])
 						go func() {
@@ -328,127 +333,79 @@ func (node *Node) Accept(
 						}()
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
-						go func() {
-							//fmt.Printf("Aquiring lock: %d\n", slot)
-							CommitLock.Lock()
-							//node.Log.Lock.Lock()
-							value, exists := node.Log.Entries.Load(slot)
-							//node.Log.Lock.Unlock()
-
-							//acked := atomic.AddUint32(&entry.acked, 1)
-
-							if exists {
-								//fmt.Printf("Exists: %d\n", slot)
-								entry := value.(*Entry)
-								if atomic.AddUint32(&entry.acked, 1) == entry.majority {
-									var requestsIds []uuid.UUID
-									start := CommitIndex
-									for {
-										next := CommitIndex + 1
-
-										//node.Log.Lock.Lock()
-										nextValue, nextEntryExists := node.Log.Entries.Load(next)
-										//nextEntry, nextEntryExists := node.Log.Entries[next]
-										//node.Log.Lock.Unlock()
-
-										if !nextEntryExists {
-											break
-										}
-
-										nextEntry := nextValue.(*Entry)
-
-										if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
-											CommitIndex = next
-											requestsIds = append(requestsIds, nextEntry.requestId)
-											//etcdWrite(nextEntry.key, nextEntry.value)
-											if nextEntry.condition != nil {
-												//fmt.Printf("Closing condition: %d\n", next)
-												close(nextEntry.condition)
-											}
-											//node.Log.Lock.Lock()
-											node.Log.Entries.Delete(next)
-											//delete(node.Log.Entries, next)
-											//node.Log.Lock.Unlock()
-										} else {
-											break
-										}
-									}
-
-									if start != CommitIndex {
-										packet := CommitPacket{
-											RequestIds: requestsIds,
-											Next:       CommitIndex,
-										}
-
-										//fmt.Printf("Commiting up to: %d\n", packet.Next)
-
-										for i := 0; i < node.Total; i++ {
-											if i == node.Index {
-												continue
-											}
-											node.Clients[i].WriteCommitPacket(packet)
-										}
-									}
-								}
-							}
-							//fmt.Printf("Releasing lock: %d\n", slot)
-							CommitLock.Unlock()
-						}()
-					} else if op == OpCommit {
-						commit := GetCommitPacket(buffer[1:])
-						//fmt.Printf("Commiting up to: %d\n", commitPacket.Next)
 						//go func() {
-						//	commitChannel <- commitPacket
-						//}()
-						//println("Got commit!")
-						for {
-							current := CommitIndex + 1
+						//fmt.Printf("Aquiring lock: %d\n", slot)
+						CommitLock.Lock()
+						//node.Log.Lock.Lock()
+						value, exists := node.Log.Entries.Load(slot)
+						//node.Log.Lock.Unlock()
 
-							if current > commit.Next {
-								break
-							}
+						//acked := atomic.AddUint32(&entry.acked, 1)
 
-							var entry Entry
-							for {
-								value, exists := node.Log.Entries.Load(current)
-								if exists {
-									entry = *(value.(*Entry))
-									node.Log.Entries.Delete(current)
-									break
-								} else {
-									//time.Sleep(5 * time.Second)
-									fmt.Printf("we are so stuck on %d\n", current)
+						if exists {
+							//fmt.Printf("Exists: %d\n", slot)
+							entry := value.(*Entry)
+							if atomic.AddUint32(&entry.acked, 1) == entry.majority {
+								var requestsIds []uuid.UUID
+								start := CommitIndex
+								for {
+									next := CommitIndex + 1
+
+									//node.Log.Lock.Lock()
+									nextValue, nextEntryExists := node.Log.Entries.Load(next)
+									//nextEntry, nextEntryExists := node.Log.Entries[next]
+									//node.Log.Lock.Unlock()
+
+									if !nextEntryExists {
+										break
+									}
+
+									nextEntry := nextValue.(*Entry)
+
+									if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
+										CommitIndex = next
+										requestsIds = append(requestsIds, nextEntry.requestId)
+										//etcdWrite(nextEntry.key, nextEntry.value)
+										if nextEntry.condition != nil {
+											//fmt.Printf("Closing condition: %d\n", next)
+											close(nextEntry.condition)
+										}
+										//node.Log.Lock.Lock()
+										node.Log.Entries.Delete(next)
+										//delete(node.Log.Entries, next)
+										//node.Log.Lock.Unlock()
+									} else {
+										break
+									}
 								}
 
-								time.Sleep(5000 * time.Millisecond)
-							}
-							//
-							CommitIndex = current
+								if start != CommitIndex {
+									packet := CommitPacket{
+										RequestIds: requestsIds,
+										Next:       CommitIndex,
+									}
 
-							if entry.condition != nil {
-								close(entry.condition)
-							}
+									//fmt.Printf("Commiting up to: %d\n", packet.Next)
 
-							requestIndex := int32(len(commit.RequestIds)) - (int32(commit.Next) - int32(current)) - 1
-							fmt.Printf("request index requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
-
-							if requestIndex >= 0 {
-								value, exists := node.RequestWaiter.Load(commit.RequestIds[requestIndex])
-								if exists {
-									channel := value.(chan struct{})
-									close(channel)
-									node.RequestWaiter.Delete(commit.RequestIds[requestIndex])
+									for i := 0; i < node.Total; i++ {
+										if i == node.Index {
+											continue
+										}
+										node.Clients[i].WriteCommitPacket(packet)
+									}
 								}
-								var count int
-								node.RequestWaiter.Range(func(key, value interface{}) bool {
-									count++
-									return true // continue iterating
-								})
-								//fmt.Printf("Request waiter size %d\n", count)
-							} else {
-								//fmt.Printf("request index too large requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
 							}
 						}
+						//fmt.Printf("Releasing lock: %d\n", slot)
+						CommitLock.Unlock()
+						//}()
+					} else if op == OpCommit {
+						commitPacket := GetCommitPacket(buffer[1:])
+						//fmt.Printf("Commiting up to: %d\n", commitPacket.Next)
+
+						commitChannel <- commitPacket
+						//<-commitChannel
+
 					}
 				}
 			}()
