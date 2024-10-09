@@ -254,7 +254,7 @@ func (node *Node) Accept(
 							condition: make(chan struct{}),
 							requestId: proposal.RequestId,
 						}
-						//fmt.Printf("Got proposal for %d\n", proposal.Slot)
+						fmt.Printf("Got proposal for %d\n", proposal.Slot)
 						//fmt.Printf("Aquiring lock for %d\n", proposal.Slot)
 						////node.Log.Lock.Lock()
 						//fmt.Printf("Got lock for %d\n", proposal.Slot)
@@ -284,6 +284,7 @@ func (node *Node) Accept(
 						}()
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
+						fmt.Printf("Got ack for %d\n", slot)
 						go func() {
 							//fmt.Printf("Aquiring lock: %d\n", slot)
 							CommitLock.Lock()
