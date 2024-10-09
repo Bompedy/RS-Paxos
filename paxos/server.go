@@ -468,14 +468,6 @@ func (node *Node) Read(
 	channel := make(chan []byte)
 	node.ReadRequestWaiter.Store(requestId, channel)
 	node.ReadSenders.Store(requestId, sender)
-	packet := ProposePacket{
-		Slot:      0,
-		RequestId: requestId,
-		Key:       key,
-		Value:     make([]byte, 0),
-		Type:      ReadType,
-		Sender:    sender,
-	}
 
 	appliedIndex := atomic.AddUint32(&AppliedIndex, 1)
 	entry := &Entry{
@@ -484,6 +476,15 @@ func (node *Node) Read(
 		acked:     1,
 		majority:  uint32(node.Quorum),
 		requestId: requestId,
+	}
+
+	packet := ProposePacket{
+		Slot:      appliedIndex,
+		RequestId: requestId,
+		Key:       key,
+		Value:     make([]byte, 0),
+		Type:      ReadType,
+		Sender:    sender,
 	}
 
 	node.Entries.Store(appliedIndex, entry)
@@ -498,7 +499,7 @@ func (node *Node) Read(
 	}
 
 	if wait {
-		fmt.Printf("Waiting on read for %s\n", requestId.String())
+		fmt.Printf("Waiting on read for slot=%d id=%s\n", appliedIndex, requestId.String())
 		return <-channel
 	}
 
