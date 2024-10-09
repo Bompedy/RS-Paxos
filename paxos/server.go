@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/klauspost/reedsolomon"
-	"golang.org/x/exp/rand"
 	"math"
 	"net"
 	"sync"
@@ -152,7 +151,6 @@ func (node *Node) Connect(
 	local string,
 	nodes []string,
 ) error {
-	rand.Seed(uint64(time.Now().UnixNano()))
 	var waiter sync.WaitGroup
 	for i, address := range nodes {
 		if address == local {
