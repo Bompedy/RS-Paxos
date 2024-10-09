@@ -184,11 +184,11 @@ func (node *Node) Accept(
 						if current > next {
 							break
 						}
-						//var entry *Entry
+						var entry *Entry
 						for {
-							_, exists := node.Entries.LoadAndDelete(current)
+							value, exists := node.Entries.LoadAndDelete(current)
 							if exists {
-								//entry = value.(*Entry)
+								entry = value.(*Entry)
 								break
 							} else {
 								logWaiterValue, logWaiterExists := node.LogWaiter.Load(current)
@@ -201,7 +201,7 @@ func (node *Node) Accept(
 							}
 						}
 						node.LogWaiter.Delete(current)
-						//etcdWrite(entry.key, entry.value)
+						etcdWrite(entry.key, entry.value)
 						CommitIndex = current
 
 						var requestId uuid.UUID
@@ -317,7 +317,7 @@ func (node *Node) Accept(
 											//fmt.Printf("Set commit index to %d\n", next)
 
 											//CommitIndex = next
-											//etcdWrite(nextEntry.key, nextEntry.value)
+											etcdWrite(nextEntry.key, nextEntry.value)
 											waiterValue, waiterExists := node.RequestWaiter.LoadAndDelete(nextEntry.requestId)
 											if waiterExists {
 												channel := waiterValue.(chan struct{})
