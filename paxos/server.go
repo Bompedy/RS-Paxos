@@ -367,7 +367,9 @@ func (node *Node) Accept(
 
 											if nextEntry.Type == ReadType {
 												//fmt.Printf("Got a read type slot=%d id=%s\n", next, nextEntry.requestId)
+												fmt.Printf("reading from etcd\n")
 												bytes := etcdRead(nextEntry.key)
+												fmt.Printf("Done reading from etcd\n")
 												senderValue, senderExists := node.ReadSenders.Load(nextEntry.requestId)
 												waiterValue, waiterExists := node.ReadRequestWaiter.LoadAndDelete(nextEntry.requestId)
 												if senderExists && waiterExists {
@@ -388,6 +390,7 @@ func (node *Node) Accept(
 											} else {
 												fmt.Printf("Writing: value=%s node=%d into etcd\n", nextEntry.value, index)
 												etcdWrite(nextEntry.key, nextEntry.value)
+												fmt.Printf("Done writing into etcd\n")
 												waiterValue, waiterExists := node.WriteRequestWaiter.LoadAndDelete(nextEntry.requestId)
 												if waiterExists {
 													channel := waiterValue.(chan struct{})
