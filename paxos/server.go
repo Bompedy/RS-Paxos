@@ -39,7 +39,6 @@ type Entry struct {
 	value     []byte
 	acked     uint32
 	majority  uint32
-	condition chan struct{}
 	requestId uuid.UUID
 }
 
@@ -184,26 +183,16 @@ func (node *Node) Accept(
 						if current > next {
 							break
 						}
-						var entry Entry
 						for {
-							value, exists := node.Entries.Load(current)
+							_, exists := node.Entries.Load(current)
 							if exists {
-								entry = *(value.(*Entry))
 								node.Entries.Delete(current)
 								break
 							} else {
-								//time.Sleep(5 * time.Second)
 								fmt.Printf("we are so stuck on %d\n", current)
 							}
-
-							//time.Sleep(5000 * time.Millisecond)
 						}
-						//
 						CommitIndex = current
-
-						if entry.condition != nil {
-							close(entry.condition)
-						}
 
 						var requestId uuid.UUID
 						value, exists := node.RequestIds.Load(current)
@@ -251,7 +240,6 @@ func (node *Node) Accept(
 							value:     proposal.Value,
 							acked:     1,
 							majority:  uint32(node.Quorum),
-							condition: make(chan struct{}),
 							requestId: proposal.RequestId,
 						}
 						fmt.Printf("Got proposal for %d\n", proposal.Slot)
@@ -311,9 +299,15 @@ func (node *Node) Accept(
 										if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
 											CommitIndex = next
 											//etcdWrite(nextEntry.key, nextEntry.value)
-											if nextEntry.condition != nil {
-												close(nextEntry.condition)
+											waiterValue, exists := node.RequestWaiter.Load(nextEntry.requestId)
+											if exists {
+												channel := waiterValue.(chan struct{})
+												close(channel)
+												node.RequestWaiter.Delete(waiterValue)
+											} else {
+												panic("LEADER DIDNT HAVE REQUEST ID")
 											}
+
 											node.Entries.Delete(next)
 										} else {
 											break
@@ -425,10 +419,11 @@ func (node *Node) Write(
 		value:     value,
 		acked:     1,
 		majority:  uint32(node.Quorum),
-		condition: make(chan struct{}),
 		requestId: requestId,
 	}
 	node.Entries.Store(appliedIndex, entry)
+	channel := make(chan struct{})
+	node.RequestWaiter.Store(requestId, channel)
 	//
 	//node.Log.Lock.Lock()
 	//node.Log.Entries[appliedIndex] = entry
@@ -451,6 +446,6 @@ func (node *Node) Write(
 	}
 
 	if wait {
-		<-entry.condition
+		<-channel
 	}
 }
