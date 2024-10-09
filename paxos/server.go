@@ -214,63 +214,59 @@ func (node *Node) Accept(
 			index := uint32(indexBuffer[0])
 
 			commitChannel := make(chan CommitPacket, 1000)
-			var commitChannelLock sync.Mutex
 
 			go func() {
-				for packet := range commitChannel {
+				for commit := range commitChannel {
 					//println("Got commit!")
-					go func(commit CommitPacket) {
-						for {
-							current := CommitIndex + 1
+					for {
+						current := CommitIndex + 1
 
-							if current > commit.Next {
-								break
-							}
-
-							var entry Entry
-							for {
-								value, exists := node.Log.Entries.Load(current)
-								if exists {
-									entry = *(value.(*Entry))
-									node.Log.Entries.Delete(current)
-									break
-								} else {
-									//time.Sleep(5 * time.Second)
-									fmt.Printf("we are so stuck on %d\n", current)
-								}
-
-								//time.Sleep(5000 * time.Millisecond)
-							}
-							//
-							CommitIndex = current
-
-							if entry.condition != nil {
-								close(entry.condition)
-							}
-
-							requestIndex := int32(len(commit.RequestIds)) - (int32(commit.Next) - int32(current)) - 1
-							fmt.Printf("request index requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
-
-							if requestIndex >= 0 {
-								value, exists := node.RequestWaiter.Load(commit.RequestIds[requestIndex])
-								if exists {
-									channel := value.(chan struct{})
-									close(channel)
-									node.RequestWaiter.Delete(commit.RequestIds[requestIndex])
-								}
-								var count int
-								node.RequestWaiter.Range(func(key, value interface{}) bool {
-									count++
-									return true // continue iterating
-								})
-								//fmt.Printf("Request waiter size %d\n", count)
-							} else {
-								//fmt.Printf("request index too large requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
-							}
+						if current > commit.Next {
+							break
 						}
 
-						commitChannelLock.Unlock()
-					}(packet)
+						var entry Entry
+						for {
+							value, exists := node.Log.Entries.Load(current)
+							if exists {
+								entry = *(value.(*Entry))
+								node.Log.Entries.Delete(current)
+								break
+							} else {
+								//time.Sleep(5 * time.Second)
+								fmt.Printf("we are so stuck on %d\n", current)
+							}
+
+							//time.Sleep(5000 * time.Millisecond)
+						}
+						//
+						CommitIndex = current
+
+						if entry.condition != nil {
+							close(entry.condition)
+						}
+
+						requestIndex := int32(len(commit.RequestIds)) - (int32(commit.Next) - int32(current)) - 1
+						fmt.Printf("request index requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
+
+						if requestIndex >= 0 {
+							value, exists := node.RequestWaiter.Load(commit.RequestIds[requestIndex])
+							if exists {
+								channel := value.(chan struct{})
+								close(channel)
+								node.RequestWaiter.Delete(commit.RequestIds[requestIndex])
+							}
+							var count int
+							node.RequestWaiter.Range(func(key, value interface{}) bool {
+								count++
+								return true // continue iterating
+							})
+							//fmt.Printf("Request waiter size %d\n", count)
+						} else {
+							//fmt.Printf("request index too large requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
+						}
+					}
+
 				}
 			}()
 
