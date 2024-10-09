@@ -320,7 +320,7 @@ func (node *Node) Accept(
 									}
 
 									if start != CommitIndex {
-										fmt.Println("Committing up to %d", CommitIndex)
+										fmt.Printf("Committing up to %d\n", CommitIndex)
 										commitBuffer := make([]byte, 9)
 										binary.LittleEndian.PutUint32(buffer[:4], 5)
 										commitBuffer[4] = OpCommit
