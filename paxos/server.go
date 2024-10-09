@@ -122,7 +122,7 @@ func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
 }
 
 func (client Client) WriteReadPacket(value []byte, requestId uuid.UUID) {
-	fmt.Printf("Writing read packet with value size: len=%d value=%s\n", uint32(len(value)), string(value))
+	//fmt.Printf("Writing read packet with value size: len=%d value=%s\n", uint32(len(value)), string(value))
 	size := 17 + len(value)
 	buffer := make([]byte, size+4)
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
@@ -130,7 +130,7 @@ func (client Client) WriteReadPacket(value []byte, requestId uuid.UUID) {
 	copy(buffer[5:21], requestId[:])
 	if size > 17 {
 		copy(buffer[21:21+len(value)], value)
-		fmt.Printf("What is it in the buffer value=%d\n: ", string(buffer[21:21+len(value)]))
+		//fmt.Printf("What is it in the buffer value=%d\n: ", string(buffer[21:21+len(value)]))
 	}
 	client.mutex.Lock()
 	err := client.Write(buffer)
@@ -370,9 +370,9 @@ func (node *Node) Accept(
 
 											if nextEntry.Type == ReadType {
 												//fmt.Printf("Got a read type slot=%d id=%s\n", next, nextEntry.requestId)
-												fmt.Printf("reading from etcd\n")
+												//fmt.Printf("reading from etcd\n")
 												bytes := etcdRead(nextEntry.key)
-												fmt.Printf("Done reading from etcd\n")
+												//fmt.Printf("Done reading from etcd\n")
 												senderValue, senderExists := node.ReadSenders.Load(nextEntry.requestId)
 												waiterValue, waiterExists := node.ReadRequestWaiter.LoadAndDelete(nextEntry.requestId)
 												if senderExists && waiterExists {
@@ -383,7 +383,7 @@ func (node *Node) Accept(
 														close(channel)
 													} else {
 														//fmt.Printf("Writing read packet to %d\n", senderIndex)
-														fmt.Printf("size of bytes in read packet node=%d: %d\n", index, len(bytes))
+														//fmt.Printf("size of bytes in read packet node=%d: %d\n", index, len(bytes))
 														node.Clients[senderIndex].WriteReadPacket(bytes, nextEntry.requestId)
 													}
 												} else {
@@ -391,9 +391,9 @@ func (node *Node) Accept(
 												}
 
 											} else {
-												fmt.Printf("Writing: value=%s node=%d into etcd\n", nextEntry.value, index)
+												//fmt.Printf("Writing: value=%s node=%d into etcd\n", nextEntry.value, index)
 												etcdWrite(nextEntry.key, nextEntry.value)
-												fmt.Printf("Done writing into etcd\n")
+												//fmt.Printf("Done writing into etcd\n")
 												waiterValue, waiterExists := node.WriteRequestWaiter.LoadAndDelete(nextEntry.requestId)
 												if waiterExists {
 													channel := waiterValue.(chan struct{})
@@ -443,7 +443,7 @@ func (node *Node) Accept(
 						} else {
 							value := make([]byte, packetSize-17)
 							copy(value, buffer[17:packetSize])
-							fmt.Printf("Got read packet size=%d id=%s value=%s\n", len(value), requestId.String(), string(value))
+							//fmt.Printf("Got read packet size=%d id=%s value=%s\n", len(value), requestId.String(), string(value))
 							readChannel <- ReadResult{requestId: requestId, value: value}
 						}
 					}
@@ -460,7 +460,7 @@ func (node *Node) ForwardRead(
 	if node.Index != node.Leader {
 		channel := make(chan []byte)
 		node.ReadRequestWaiter.Store(requestId, channel)
-		fmt.Printf("Forwarding %s\n", requestId.String())
+		//fmt.Printf("Forwarding %s\n", requestId.String())
 		packet := ProposePacket{
 			Slot:      0,
 			RequestId: requestId,
@@ -516,7 +516,7 @@ func (node *Node) Read(
 	}
 
 	if wait {
-		fmt.Printf("Waiting on read for slot=%d id=%s\n", appliedIndex, requestId.String())
+		//fmt.Printf("Waiting on read for slot=%d id=%s\n", appliedIndex, requestId.String())
 		return <-channel
 	}
 
@@ -527,7 +527,7 @@ func (node *Node) ForwardWrite(
 	key []byte,
 	value []byte,
 ) {
-	fmt.Printf("Writing value: %d   value=%s\n", len(value), string(value))
+	//fmt.Printf("Writing value: %d   value=%s\n", len(value), string(value))
 	requestId := uuid.New()
 	if node.Index != node.Leader {
 		packet := ProposePacket{
