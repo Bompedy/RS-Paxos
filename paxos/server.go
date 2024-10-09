@@ -296,6 +296,7 @@ func (node *Node) Accept(
 
 					op := buffer[0]
 					if op == OpPropose {
+						println("got proposals")
 						proposal := GetProposePacket(buffer[1:])
 						entry := &Entry{
 							key:       proposal.Key,
@@ -578,7 +579,7 @@ func (node *Node) Write(
 		}
 		i := i
 		go func(index int, client Client) {
-			//fmt.Printf("Sending proposal %d to %d\n", appliedIndex, i)
+			fmt.Printf("Sending proposal %d to %d\n", appliedIndex, i)
 			client.WriteProposePacket(ProposePacket{
 				Key:       key,
 				Value:     segments[i],
