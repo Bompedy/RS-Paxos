@@ -496,6 +496,7 @@ func (node *Node) Read(
 	}
 
 	if wait {
+		fmt.Printf("Waiting on read for %d\n", requestId)
 		return <-channel
 	}
 
