@@ -250,6 +250,7 @@ func (node *Node) Accept(
 						var requestId uuid.UUID
 						value, exists := node.RequestIds.LoadAndDelete(current)
 						if !exists {
+							fmt.Printf("CANT FIND ID FOR: %d\n", current)
 							panic("BIG PROBLEM CAN'T FIND WRITE requestID")
 						}
 
