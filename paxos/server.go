@@ -86,6 +86,7 @@ func GetProposePacket(buffer []byte) ProposePacket {
 		Key:       key,
 		Value:     value,
 		RequestId: requestId,
+		Type:      packetType,
 		Sender:    sender,
 	}
 }
