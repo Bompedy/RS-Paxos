@@ -431,7 +431,7 @@ func (node *Node) Accept(
 						value := make([]byte, packetSize-17)
 						copy(requestId[:], buffer[1:17])
 						copy(value, buffer[17:packetSize-17])
-						fmt.Printf("Got read packet %s\n", requestId.String())
+						fmt.Printf("Got read packet size=%d %s\n", len(value), requestId.String())
 						readChannel <- ReadResult{requestId: requestId, value: value}
 					}
 				}
