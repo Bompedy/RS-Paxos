@@ -429,7 +429,7 @@ func (node *Node) Accept(
 					} else if op == OpRead {
 						var requestId uuid.UUID
 						value := make([]byte, packetSize-17)
-						copy(buffer[1:17], requestId[:])
+						copy(requestId[:], buffer[1:17])
 						copy(value, buffer[17:packetSize-17])
 						fmt.Printf("Got read packet %s\n", requestId.String())
 						readChannel <- ReadResult{requestId: requestId, value: value}
