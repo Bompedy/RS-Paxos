@@ -122,7 +122,7 @@ func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
 }
 
 func (client Client) WriteReadPacket(value []byte, requestId uuid.UUID) {
-	fmt.Printf("Writing read packet with value size: %d", uint32(len(value)))
+	fmt.Printf("Writing read packet with value size: %d\n", uint32(len(value)))
 	size := 17 + len(value)
 	buffer := make([]byte, size+4)
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
