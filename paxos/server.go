@@ -339,6 +339,7 @@ func (node *Node) Accept(
 						}()
 					} else if op == OpAck {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
+						fmt.Printf("Got ack for slot=%d node=%d\n", slot, index)
 						go func() {
 							value, exists := node.Entries.Load(slot)
 
