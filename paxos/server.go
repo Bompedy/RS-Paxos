@@ -585,6 +585,7 @@ func (node *Node) Write(
 				Value:     segments[i],
 				Slot:      appliedIndex,
 				RequestId: requestId,
+				Type:      WriteType,
 				Sender:    uint8(node.Index),
 			}, OpPropose)
 		}(i, node.Clients[i])
