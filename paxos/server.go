@@ -300,7 +300,7 @@ func (node *Node) Accept(
 										//next := start + 1
 										nextValue, nextEntryExists := node.Entries.Load(next)
 										if !nextEntryExists {
-											fmt.Printf("No entry breaking out %d\n", next)
+											//fmt.Printf("No entry breaking out %d\n", next)
 											break
 										}
 
@@ -308,12 +308,12 @@ func (node *Node) Accept(
 
 										if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
 											if !atomic.CompareAndSwapUint32(&CommitIndex, next-1, next) {
-												fmt.Printf("Had to break out %d\n", next)
+												//fmt.Printf("Had to break out %d\n", next)
 												next -= 1
 												break
 											}
 
-											fmt.Printf("Set commit index to %d\n", next)
+											//fmt.Printf("Set commit index to %d\n", next)
 
 											//CommitIndex = next
 											//etcdWrite(nextEntry.key, nextEntry.value)
@@ -333,7 +333,7 @@ func (node *Node) Accept(
 									}
 
 									if start != next {
-										fmt.Printf("Start != next %d\n", next)
+										//fmt.Printf("Start != next %d\n", next)
 										//fmt.Printf("Committing up to %d\n", CommitIndex)
 										commitBuffer := make([]byte, 9)
 										binary.LittleEndian.PutUint32(commitBuffer[:4], 5)
