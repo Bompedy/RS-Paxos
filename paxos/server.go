@@ -189,11 +189,21 @@ func (node *Node) Accept(
 							value, exists := node.Entries.LoadAndDelete(current)
 							if exists {
 								entry = value.(*Entry)
+								//
 								break
 							} else {
+								logWaiterValue, logWaiterExists := node.LogWaiter.Load(current)
+								if logWaiterExists {
+									<-logWaiterValue.(chan struct{})
+								} else {
+									node.LogWaiter.Store(current, make(chan struct{}))
+								}
+								// if its in here, channel.wait
+								// else add it
 								fmt.Printf("we are so stuck on %d\n", current)
 							}
 						}
+						node.LogWaiter.Delete(current)
 						etcdWrite(entry.key, entry.value)
 						CommitIndex = current
 
@@ -234,7 +244,6 @@ func (node *Node) Accept(
 					op := buffer[0]
 					if op == OpPropose {
 						proposal := GetProposePacket(buffer[1:])
-
 						entry := &Entry{
 							key:       proposal.Key,
 							value:     proposal.Value,
@@ -248,7 +257,14 @@ func (node *Node) Accept(
 						//fmt.Printf("Got lock for %d\n", proposal.Slot)
 						node.RequestIds.Store(proposal.Slot, entry.requestId)
 						node.Entries.Store(proposal.Slot, entry)
-						node.LogWaiter.Load(proposal.Slot) // channel, close(channel)
+
+						//
+						value, exists := node.LogWaiter.LoadAndDelete(proposal.Slot) // channel, close(channel)
+						if exists {
+							close(value.(chan struct{}))
+						}
+						//
+
 						//node.Log.Entries[proposal.Slot] = entry
 						//node.Log.Lock.Unlock()
 
