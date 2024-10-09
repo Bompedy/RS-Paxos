@@ -378,7 +378,7 @@ func (node *Node) Accept(
 														close(channel)
 													} else {
 														//fmt.Printf("Writing read packet to %d\n", senderIndex)
-														fmt.Printf("size of bytes in read packet: %d\n", len(bytes))
+														fmt.Printf("size of bytes in read packet node=%d: %d\n", index, len(bytes))
 														node.Clients[senderIndex].WriteReadPacket(bytes, nextEntry.requestId)
 													}
 												} else {
@@ -386,7 +386,7 @@ func (node *Node) Accept(
 												}
 
 											} else {
-												fmt.Printf("Writing: value=%s into etcd", nextEntry.value)
+												fmt.Printf("Writing: value=%s node=%d into etcd", index, nextEntry.value)
 												etcdWrite(nextEntry.key, nextEntry.value)
 												waiterValue, waiterExists := node.WriteRequestWaiter.LoadAndDelete(nextEntry.requestId)
 												if waiterExists {
