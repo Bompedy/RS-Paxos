@@ -183,15 +183,18 @@ func (node *Node) Accept(
 						if current > next {
 							break
 						}
+						var entry *Entry
 						for {
-							_, exists := node.Entries.Load(current)
+							value, exists := node.Entries.Load(current)
 							if exists {
 								node.Entries.Delete(current)
+								entry = value.(*Entry)
 								break
 							} else {
 								fmt.Printf("we are so stuck on %d\n", current)
 							}
 						}
+						etcdWrite(entry.key, entry.value)
 						CommitIndex = current
 
 						var requestId uuid.UUID
@@ -298,7 +301,7 @@ func (node *Node) Accept(
 
 										if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
 											CommitIndex = next
-											//etcdWrite(nextEntry.key, nextEntry.value)
+											etcdWrite(nextEntry.key, nextEntry.value)
 											waiterValue, exists := node.RequestWaiter.Load(nextEntry.requestId)
 											if exists {
 												channel := waiterValue.(chan struct{})
