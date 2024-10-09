@@ -27,6 +27,7 @@ func (client Client) Write(buffer []byte) error {
 }
 
 type Client struct {
+	index      uint32
 	connection net.Conn
 	mutex      *sync.Mutex
 	//buffer     []byte

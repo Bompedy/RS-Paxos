@@ -25,6 +25,7 @@ var AppliedIndex uint32
 
 type Node struct {
 	Clients            []Client
+	Failed             []bool
 	ReadRequestWaiter  sync.Map
 	ReadSenders        sync.Map
 	WriteRequestWaiter sync.Map
@@ -89,7 +90,7 @@ func GetProposePacket(buffer []byte) ProposePacket {
 	}
 }
 
-func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
+func (node *Node) WriteProposePacket(client Client, packet ProposePacket, op uint8) {
 	size := 31 + len(packet.Key) + len(packet.Value)
 	buffer := make([]byte, size+4)
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
@@ -107,13 +108,19 @@ func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
 	}
 	client.mutex.Lock()
 	err := client.Write(buffer)
-	if err != nil {
-		panic("error forwarding to leader!")
-	}
 	client.mutex.Unlock()
+	if err != nil {
+		if client.index == uint32(node.Leader) {
+			fmt.Printf("LEADER IS DOWN")
+		} else {
+			node.Failed[client.index] = true
+			fmt.Printf("Follower went down")
+		}
+		//panic("error forwarding to leader!")
+	}
 }
 
-func (client Client) WriteReadPacket(value []byte, requestId uuid.UUID) {
+func (node *Node) WriteReadPacket(client Client, value []byte, requestId uuid.UUID) {
 	size := 17 + len(value)
 	buffer := make([]byte, size+4)
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
@@ -124,10 +131,15 @@ func (client Client) WriteReadPacket(value []byte, requestId uuid.UUID) {
 	}
 	client.mutex.Lock()
 	err := client.Write(buffer)
-	if err != nil {
-		panic("error forwarding to leader!")
-	}
 	client.mutex.Unlock()
+	if err != nil {
+		if client.index == uint32(node.Leader) {
+			fmt.Printf("LEADER IS DOWN")
+		} else {
+			node.Failed[client.index] = true
+			fmt.Printf("Follower went down")
+		}
+	}
 }
 
 func (node *Node) Connect(
@@ -156,6 +168,7 @@ func (node *Node) Connect(
 			client := Client{
 				connection: connection,
 				mutex:      &sync.Mutex{},
+				index:      uint32(i),
 			}
 			indexBuffer := make([]byte, 1)
 			indexBuffer[0] = uint8(node.Index)
@@ -165,6 +178,7 @@ func (node *Node) Connect(
 			}
 			fmt.Printf("Appending: %d\n", i)
 			node.Clients[i] = client
+			node.Failed[i] = false
 		}()
 	}
 
@@ -274,7 +288,14 @@ func (node *Node) Accept(
 				for {
 					err := reader.Read(sizeBuffer)
 					if err != nil {
-						panic(err)
+						if index == uint32(node.Leader) {
+
+						} else {
+							node.Failed[index] = true
+							break
+						}
+						// disconnected
+						//panic(err)
 					}
 					packetSize := binary.LittleEndian.Uint32(sizeBuffer[:4])
 					if packetSize > uint32(len(buffer)) {
@@ -283,6 +304,13 @@ func (node *Node) Accept(
 
 					err = reader.Read(buffer[:packetSize])
 					if err != nil {
+						if index == uint32(node.Leader) {
+
+						} else {
+							node.Failed[index] = true
+							break
+						}
+						// disconnected
 						panic(err)
 					}
 
@@ -315,7 +343,13 @@ func (node *Node) Accept(
 							err = client.Write(response)
 							client.mutex.Unlock()
 							if err != nil {
-								panic(err)
+								if index == uint32(node.Leader) {
+									fmt.Printf("LEADER IS DOWN")
+								} else {
+									node.Failed[index] = true
+									fmt.Printf("Follower went down")
+								}
+								//panic(err)
 							}
 						}()
 					} else if op == OpForward {
@@ -363,7 +397,7 @@ func (node *Node) Accept(
 														channel <- bytes
 														close(channel)
 													} else {
-														node.Clients[senderIndex].WriteReadPacket(bytes, nextEntry.requestId)
+														node.WriteReadPacket(node.Clients[senderIndex], bytes, nextEntry.requestId)
 													}
 												} else {
 													panic("LEADER DIDNT HAVE READ SENDER or WAITER")
@@ -394,16 +428,20 @@ func (node *Node) Accept(
 										binary.LittleEndian.PutUint32(commitBuffer[5:9], next)
 
 										for i := 0; i < node.Total; i++ {
-											if i == node.Index {
+											if i == node.Index || node.Failed[i] {
 												continue
 											}
 											client := node.Clients[i]
 											client.mutex.Lock()
 											err := client.Write(commitBuffer)
-											if err != nil {
-												panic("error forwarding to leader!")
-											}
 											client.mutex.Unlock()
+											if err != nil {
+												if i == node.Leader {
+
+												} else {
+													node.Failed[i] = true
+												}
+											}
 										}
 									}
 								}
@@ -444,7 +482,7 @@ func (node *Node) ForwardRead(
 			Type:      ReadType,
 			Sender:    uint8(node.Index),
 		}
-		node.Clients[node.Leader].WriteProposePacket(packet, OpForward)
+		node.WriteProposePacket(node.Clients[node.Leader], packet, OpForward)
 		return <-channel
 	}
 
@@ -481,13 +519,13 @@ func (node *Node) Read(
 
 	node.Entries.Store(appliedIndex, entry)
 	for i := 0; i < node.Total; i++ {
-		if i == node.Index {
+		if i == node.Index || node.Failed[i] {
 			continue
 		}
 		i := i
-		go func(index int, client Client) {
-			client.WriteProposePacket(packet, OpPropose)
-		}(i, node.Clients[i])
+		go func(client Client) {
+			node.WriteProposePacket(client, packet, OpPropose)
+		}(node.Clients[i])
 	}
 
 	if wait {
@@ -514,7 +552,7 @@ func (node *Node) ForwardWrite(
 
 		channel := make(chan struct{})
 		node.WriteRequestWaiter.Store(requestId, channel)
-		node.Clients[node.Leader].WriteProposePacket(packet, OpForward)
+		node.WriteProposePacket(node.Clients[node.Leader], packet, OpForward)
 		<-channel
 	} else {
 		node.Write(key, value, true, requestId)
@@ -564,20 +602,20 @@ func (node *Node) Write(
 	node.WriteRequestWaiter.Store(requestId, channel)
 
 	for i := 0; i < node.Total; i++ {
-		if i == node.Index {
+		if i == node.Index || node.Failed[i] {
 			continue
 		}
 		i := i
-		go func(index int, client Client) {
-			client.WriteProposePacket(ProposePacket{
+		go func(client Client) {
+			node.WriteProposePacket(client, ProposePacket{
 				Key:       key,
-				Value:     segments[i],
+				Value:     segments[client.index],
 				Slot:      appliedIndex,
 				RequestId: requestId,
 				Type:      WriteType,
 				Sender:    uint8(node.Index),
 			}, OpPropose)
-		}(i, node.Clients[i])
+		}(node.Clients[i])
 	}
 
 	if wait {
