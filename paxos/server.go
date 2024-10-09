@@ -22,8 +22,8 @@ var AppliedIndex uint32
 
 type Node struct {
 	Clients       []Client
-	RequestLock   *sync.Mutex
 	RequestWaiter sync.Map
+	RequestIds    sync.Map
 	Total         int
 	Encoder       reedsolomon.Encoder
 	Log           Log
@@ -35,7 +35,6 @@ type Node struct {
 }
 
 type Log struct {
-	Lock    *sync.Mutex
 	Entries sync.Map
 }
 
@@ -125,21 +124,6 @@ func (client Client) WriteCommitPacket(packet CommitPacket) {
 	client.mutex.Unlock()
 }
 
-func GetCommitPacket(buffer []byte) CommitPacket {
-	next := binary.LittleEndian.Uint32(buffer[:4])
-	totalRequestIds := binary.LittleEndian.Uint32(buffer[4:8])
-	requestIds := make([]uuid.UUID, totalRequestIds)
-	for i := uint32(0); i < totalRequestIds; i++ {
-
-		copy(requestIds[i][:], buffer[8+(i*16):8+(i*16)+16])
-	}
-
-	return CommitPacket{
-		Next:       next,
-		RequestIds: requestIds,
-	}
-}
-
 func (node *Node) Connect(
 	local string,
 	nodes []string,
@@ -213,15 +197,18 @@ func (node *Node) Accept(
 			}
 			index := uint32(indexBuffer[0])
 
-			commitChannel := make(chan CommitPacket, 1000)
+			commitChannel := make(chan uint32, 4096)
 
 			go func() {
-				for commit := range commitChannel {
+				for next := range commitChannel {
 					//println("Got commit!")
+					if next > CommitIndex+2048 {
+						next = CommitIndex + 2048
+					}
 					for {
 						current := CommitIndex + 1
 
-						if current > commit.Next {
+						if current > next {
 							break
 						}
 
@@ -246,24 +233,19 @@ func (node *Node) Accept(
 							close(entry.condition)
 						}
 
-						requestIndex := int32(len(commit.RequestIds)) - (int32(commit.Next) - int32(current)) - 1
-						fmt.Printf("request index requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
+						var requestId uuid.UUID
+						value, exists := node.RequestIds.Load(current)
+						if !exists {
+							panic("BIG PROBLEM CAN'T FIND requestID")
+						}
+						node.RequestWaiter.Delete(current)
 
-						if requestIndex >= 0 {
-							value, exists := node.RequestWaiter.Load(commit.RequestIds[requestIndex])
-							if exists {
-								channel := value.(chan struct{})
-								close(channel)
-								node.RequestWaiter.Delete(commit.RequestIds[requestIndex])
-							}
-							var count int
-							node.RequestWaiter.Range(func(key, value interface{}) bool {
-								count++
-								return true // continue iterating
-							})
-							//fmt.Printf("Request waiter size %d\n", count)
-						} else {
-							//fmt.Printf("request index too large requestIds=%d next=%d current=%d requestIndex=%d\n", len(commit.RequestIds), commit.Next, current, requestIndex)
+						requestId = *(value.(*uuid.UUID))
+						waiterValue, exists := node.RequestWaiter.Load(requestId)
+						if exists {
+							channel := value.(chan struct{})
+							close(channel)
+							node.RequestWaiter.Delete(waiterValue)
 						}
 					}
 
@@ -304,6 +286,7 @@ func (node *Node) Accept(
 						//fmt.Printf("Aquiring lock for %d\n", proposal.Slot)
 						////node.Log.Lock.Lock()
 						//fmt.Printf("Got lock for %d\n", proposal.Slot)
+						node.RequestIds.Store(proposal.Slot, entry.requestId)
 						node.Log.Entries.Store(proposal.Slot, entry)
 						//node.Log.Entries[proposal.Slot] = entry
 						//node.Log.Lock.Unlock()
@@ -346,12 +329,7 @@ func (node *Node) Accept(
 									start := CommitIndex
 									for {
 										next := CommitIndex + 1
-
-										//node.Log.Lock.Lock()
 										nextValue, nextEntryExists := node.Log.Entries.Load(next)
-										//nextEntry, nextEntryExists := node.Log.Entries[next]
-										//node.Log.Lock.Unlock()
-
 										if !nextEntryExists {
 											break
 										}
@@ -360,16 +338,11 @@ func (node *Node) Accept(
 
 										if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
 											CommitIndex = next
-											requestsIds = append(requestsIds, nextEntry.requestId)
 											//etcdWrite(nextEntry.key, nextEntry.value)
 											if nextEntry.condition != nil {
-												//fmt.Printf("Closing condition: %d\n", next)
 												close(nextEntry.condition)
 											}
-											//node.Log.Lock.Lock()
 											node.Log.Entries.Delete(next)
-											//delete(node.Log.Entries, next)
-											//node.Log.Lock.Unlock()
 										} else {
 											break
 										}
@@ -381,13 +354,22 @@ func (node *Node) Accept(
 											Next:       CommitIndex,
 										}
 
-										//fmt.Printf("Commiting up to: %d\n", packet.Next)
+										commitBuffer := make([]byte, 9)
+										binary.LittleEndian.PutUint32(buffer[:4], 5)
+										commitBuffer[4] = OpCommit
+										binary.LittleEndian.PutUint32(commitBuffer[5:9], packet.Next)
 
 										for i := 0; i < node.Total; i++ {
 											if i == node.Index {
 												continue
 											}
-											node.Clients[i].WriteCommitPacket(packet)
+											client := node.Clients[i]
+											client.mutex.Lock()
+											err := client.Write(buffer)
+											if err != nil {
+												panic("error forwarding to leader!")
+											}
+											client.mutex.Unlock()
 										}
 									}
 								}
@@ -396,12 +378,8 @@ func (node *Node) Accept(
 							CommitLock.Unlock()
 						}()
 					} else if op == OpCommit {
-						commitPacket := GetCommitPacket(buffer[1:])
-						//fmt.Printf("Commiting up to: %d\n", commitPacket.Next)
-
-						commitChannel <- commitPacket
-						//<-commitChannel
-
+						slot := binary.LittleEndian.Uint32(buffer[1:])
+						commitChannel <- slot
 					}
 				}
 			}()
