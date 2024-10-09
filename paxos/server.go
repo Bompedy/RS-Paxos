@@ -300,6 +300,7 @@ func (node *Node) Accept(
 										//next := start + 1
 										nextValue, nextEntryExists := node.Entries.Load(next)
 										if !nextEntryExists {
+											fmt.Printf("No entry breaking out %d\n", next)
 											break
 										}
 
