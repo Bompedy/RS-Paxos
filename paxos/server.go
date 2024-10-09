@@ -128,7 +128,10 @@ func (client Client) WriteReadPacket(value []byte, requestId uuid.UUID) {
 	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
 	buffer[4] = OpRead
 	copy(buffer[5:21], requestId[:])
-	copy(buffer[21:21+len(value)], value)
+	if size > 17 {
+		copy(buffer[21:21+len(value)], value)
+		fmt.Printf("What is it in the buffer value=%d\n: ", string(buffer[21:21+len(value)]))
+	}
 	client.mutex.Lock()
 	err := client.Write(buffer)
 	if err != nil {
