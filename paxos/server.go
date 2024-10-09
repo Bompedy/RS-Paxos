@@ -203,15 +203,14 @@ func (node *Node) Accept(
 				for next := range commitChannel {
 					//println("Got commit!")
 					if next > CommitIndex+2048 {
+						panic("GOT TOO FAR APART")
 						next = CommitIndex + 2048
 					}
 					for {
 						current := CommitIndex + 1
-
 						if current > next {
 							break
 						}
-
 						var entry Entry
 						for {
 							value, exists := node.Log.Entries.Load(current)
