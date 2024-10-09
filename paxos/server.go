@@ -430,6 +430,7 @@ func (node *Node) Accept(
 						value := make([]byte, packetSize-17)
 						copy(buffer[1:17], requestId[:])
 						copy(value, buffer[17:packetSize-17])
+						println("We got a read for some reason?")
 						readChannel <- ReadResult{requestId: requestId, value: value}
 					}
 				}
