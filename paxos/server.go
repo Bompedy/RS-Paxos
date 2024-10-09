@@ -184,11 +184,11 @@ func (node *Node) Accept(
 						if current > next {
 							break
 						}
-						var entry *Entry
+						//var entry *Entry
 						for {
-							value, exists := node.Entries.LoadAndDelete(current)
+							_, exists := node.Entries.LoadAndDelete(current)
 							if exists {
-								entry = value.(*Entry)
+								//entry = value.(*Entry)
 								//
 								break
 							} else {
@@ -204,7 +204,7 @@ func (node *Node) Accept(
 							}
 						}
 						node.LogWaiter.Delete(current)
-						etcdWrite(entry.key, entry.value)
+						//etcdWrite(entry.key, entry.value)
 						CommitIndex = current
 
 						var requestId uuid.UUID
@@ -310,7 +310,7 @@ func (node *Node) Accept(
 
 										if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
 											CommitIndex = next
-											etcdWrite(nextEntry.key, nextEntry.value)
+											//etcdWrite(nextEntry.key, nextEntry.value)
 											waiterValue, waiterExists := node.RequestWaiter.LoadAndDelete(nextEntry.requestId)
 											if waiterExists {
 												channel := waiterValue.(chan struct{})
