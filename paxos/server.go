@@ -632,34 +632,14 @@ func (node *Node) ForwardWrite(
 	}
 }
 
+var ENCODING_ENABLED = false
+
 func (node *Node) Write(
 	key []byte,
 	value []byte,
 	wait bool,
 	requestId uuid.UUID,
 ) {
-
-	var segmentSize = int(math.Ceil(float64(len(value)) / float64(node.Segments)))
-	var segments = reedsolomon.AllocAligned(node.Segments+node.Parity, segmentSize)
-	var startIndex = 0
-	for i := range segments[:node.Segments] {
-		endIndex := startIndex + segmentSize
-		if endIndex > len(value) {
-			endIndex = len(value)
-		}
-		copy(segments[i], value[startIndex:endIndex])
-		startIndex = endIndex
-	}
-
-	err := node.Encoder.Encode(segments)
-	if err != nil {
-		panic(err)
-	}
-
-	ok, err := node.Encoder.Verify(segments)
-	if err != nil || !ok {
-		panic(err)
-	}
 
 	appliedIndex := atomic.AddUint32(&AppliedIndex, 1)
 	entry := &Entry{
@@ -674,21 +654,62 @@ func (node *Node) Write(
 	channel := make(chan struct{})
 	node.WriteRequestWaiter.Store(requestId, channel)
 
-	for i := 0; i < node.Total; i++ {
-		if i == node.Index || node.Failed[i] {
-			continue
+	if ENCODING_ENABLED {
+		var segmentSize = int(math.Ceil(float64(len(value)) / float64(node.Segments)))
+		var segments = reedsolomon.AllocAligned(node.Segments+node.Parity, segmentSize)
+		var startIndex = 0
+		for i := range segments[:node.Segments] {
+			endIndex := startIndex + segmentSize
+			if endIndex > len(value) {
+				endIndex = len(value)
+			}
+			copy(segments[i], value[startIndex:endIndex])
+			startIndex = endIndex
 		}
-		i := i
-		go func(client Client) {
-			node.WriteProposePacket(client, ProposePacket{
-				Key:       key,
-				Value:     segments[client.index],
-				Slot:      appliedIndex,
-				RequestId: requestId,
-				Type:      WriteType,
-				Sender:    uint8(node.Index),
-			}, OpPropose)
-		}(node.Clients[i])
+
+		err := node.Encoder.Encode(segments)
+		if err != nil {
+			panic(err)
+		}
+
+		ok, err := node.Encoder.Verify(segments)
+		if err != nil || !ok {
+			panic(err)
+		}
+
+		for i := 0; i < node.Total; i++ {
+			if i == node.Index || node.Failed[i] {
+				continue
+			}
+			i := i
+			go func(client Client) {
+				node.WriteProposePacket(client, ProposePacket{
+					Key:       key,
+					Value:     segments[client.index],
+					Slot:      appliedIndex,
+					RequestId: requestId,
+					Type:      WriteType,
+					Sender:    uint8(node.Index),
+				}, OpPropose)
+			}(node.Clients[i])
+		}
+	} else {
+		for i := 0; i < node.Total; i++ {
+			if i == node.Index || node.Failed[i] {
+				continue
+			}
+			i := i
+			go func(client Client) {
+				node.WriteProposePacket(client, ProposePacket{
+					Key:       key,
+					Value:     value,
+					Slot:      appliedIndex,
+					RequestId: requestId,
+					Type:      WriteType,
+					Sender:    uint8(node.Index),
+				}, OpPropose)
+			}(node.Clients[i])
+		}
 	}
 
 	if wait {
