@@ -50,11 +50,6 @@ type ProposePacket struct {
 	RequestId uuid.UUID
 }
 
-type CommitPacket struct {
-	RequestIds []uuid.UUID
-	Next       uint32
-}
-
 func GetProposePacket(buffer []byte) ProposePacket {
 	//requestId := binary.LittleEndian.Uint32(buffer[:4])
 	var requestId uuid.UUID
@@ -100,24 +95,6 @@ func (client Client) WriteProposePacket(packet ProposePacket, op uint8) {
 	}
 	client.mutex.Unlock()
 	//println("Done reading proposal")
-}
-
-func (client Client) WriteCommitPacket(packet CommitPacket) {
-	size := 9 + (16 * len(packet.RequestIds))
-	buffer := make([]byte, size+4)
-	binary.LittleEndian.PutUint32(buffer[:4], uint32(size))
-	buffer[4] = OpCommit
-	binary.LittleEndian.PutUint32(buffer[5:9], packet.Next)
-	binary.LittleEndian.PutUint32(buffer[9:13], uint32(len(packet.RequestIds)))
-	for i, requestId := range packet.RequestIds {
-		copy(buffer[13+(i*16):], requestId[:])
-	}
-	client.mutex.Lock()
-	err := client.Write(buffer)
-	if err != nil {
-		panic("error forwarding to leader!")
-	}
-	client.mutex.Unlock()
 }
 
 func (node *Node) Connect(
@@ -320,7 +297,6 @@ func (node *Node) Accept(
 								//fmt.Printf("Exists: %d\n", slot)
 								entry := value.(*Entry)
 								if atomic.AddUint32(&entry.acked, 1) == entry.majority {
-									var requestsIds []uuid.UUID
 									start := CommitIndex
 									for {
 										next := CommitIndex + 1
@@ -344,15 +320,11 @@ func (node *Node) Accept(
 									}
 
 									if start != CommitIndex {
-										packet := CommitPacket{
-											RequestIds: requestsIds,
-											Next:       CommitIndex,
-										}
-
+										fmt.Println("Committing up to %d", CommitIndex)
 										commitBuffer := make([]byte, 9)
 										binary.LittleEndian.PutUint32(buffer[:4], 5)
 										commitBuffer[4] = OpCommit
-										binary.LittleEndian.PutUint32(commitBuffer[5:9], packet.Next)
+										binary.LittleEndian.PutUint32(commitBuffer[5:9], CommitIndex)
 
 										for i := 0; i < node.Total; i++ {
 											if i == node.Index {
