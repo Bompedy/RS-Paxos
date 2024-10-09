@@ -16,7 +16,7 @@ var OpCommit = uint8(1)
 var OpForward = uint8(2)
 var OpAck = uint8(3)
 
-var CommitLock sync.Mutex
+// var CommitLock sync.Mutex
 var CommitIndex uint32
 var AppliedIndex uint32
 
@@ -189,7 +189,6 @@ func (node *Node) Accept(
 							_, exists := node.Entries.LoadAndDelete(current)
 							if exists {
 								//entry = value.(*Entry)
-								//
 								break
 							} else {
 								logWaiterValue, logWaiterExists := node.LogWaiter.Load(current)
@@ -198,8 +197,6 @@ func (node *Node) Accept(
 								} else {
 									node.LogWaiter.Store(current, make(chan struct{}))
 								}
-								// if its in here, channel.wait
-								// else add it
 								fmt.Printf("we are so stuck on %d\n", current)
 							}
 						}
@@ -251,22 +248,13 @@ func (node *Node) Accept(
 							majority:  uint32(node.Quorum),
 							requestId: proposal.RequestId,
 						}
-						//fmt.Printf("Got proposal for %d\n", proposal.Slot)
-						//fmt.Printf("Aquiring lock for %d\n", proposal.Slot)
-						////node.Log.Lock.Lock()
-						//fmt.Printf("Got lock for %d\n", proposal.Slot)
 						node.RequestIds.Store(proposal.Slot, entry.requestId)
 						node.Entries.Store(proposal.Slot, entry)
 
-						//
 						value, exists := node.LogWaiter.LoadAndDelete(proposal.Slot) // channel, close(channel)
 						if exists {
 							close(value.(chan struct{}))
 						}
-						//
-
-						//node.Log.Entries[proposal.Slot] = entry
-						//node.Log.Lock.Unlock()
 
 						go func() {
 							// ack
@@ -291,16 +279,25 @@ func (node *Node) Accept(
 						slot := binary.LittleEndian.Uint32(buffer[1:])
 						fmt.Printf("Got ack for %d\n", slot)
 						go func() {
-							CommitLock.Lock()
+							//CommitLock.Lock()
 							value, exists := node.Entries.Load(slot)
+
+							//commitIndex = 0
+							//50
+							//commitIndex = 5
+							//10
+							//100
+							//commitIndex = 25
+							//50
 
 							if exists {
 								//fmt.Printf("Exists: %d\n", slot)
 								entry := value.(*Entry)
-								if atomic.AddUint32(&entry.acked, 1) == entry.majority {
-									start := CommitIndex
+								if atomic.AddUint32(&entry.acked, 1) == entry.majority { // 4, 2
+									start := atomic.LoadUint32(&CommitIndex)
+									next := start + 1
 									for {
-										next := CommitIndex + 1
+										//next := start + 1
 										nextValue, nextEntryExists := node.Entries.Load(next)
 										if !nextEntryExists {
 											break
@@ -309,7 +306,13 @@ func (node *Node) Accept(
 										nextEntry := nextValue.(*Entry)
 
 										if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
-											CommitIndex = next
+											if !atomic.CompareAndSwapUint32(&CommitIndex, next-1, next) {
+												next -= 1
+												break
+											}
+
+											next += 1
+											//CommitIndex = next
 											//etcdWrite(nextEntry.key, nextEntry.value)
 											waiterValue, waiterExists := node.RequestWaiter.LoadAndDelete(nextEntry.requestId)
 											if waiterExists {
@@ -325,12 +328,12 @@ func (node *Node) Accept(
 										}
 									}
 
-									if start != CommitIndex {
+									if start != next {
 										//fmt.Printf("Committing up to %d\n", CommitIndex)
 										commitBuffer := make([]byte, 9)
 										binary.LittleEndian.PutUint32(commitBuffer[:4], 5)
 										commitBuffer[4] = OpCommit
-										binary.LittleEndian.PutUint32(commitBuffer[5:9], CommitIndex)
+										binary.LittleEndian.PutUint32(commitBuffer[5:9], next)
 
 										for i := 0; i < node.Total; i++ {
 											if i == node.Index {
@@ -348,7 +351,7 @@ func (node *Node) Accept(
 								}
 							}
 							//fmt.Printf("Releasing lock: %d\n", slot)
-							CommitLock.Unlock()
+							//CommitLock.Unlock()
 						}()
 					} else if op == OpCommit {
 						slot := binary.LittleEndian.Uint32(buffer[1:])
