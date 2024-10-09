@@ -382,6 +382,7 @@ func (node *Node) Accept(
 												}
 
 											} else {
+												fmt.Printf("Writing: %d")
 												etcdWrite(nextEntry.key, nextEntry.value)
 												waiterValue, waiterExists := node.WriteRequestWaiter.LoadAndDelete(nextEntry.requestId)
 												if waiterExists {
