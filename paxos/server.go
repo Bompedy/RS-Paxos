@@ -632,7 +632,7 @@ func (node *Node) ForwardWrite(
 	}
 }
 
-var ENCODING_ENABLED = false
+var EncodingEnabled = false
 
 func (node *Node) Write(
 	key []byte,
@@ -654,7 +654,7 @@ func (node *Node) Write(
 	channel := make(chan struct{})
 	node.WriteRequestWaiter.Store(requestId, channel)
 
-	if ENCODING_ENABLED {
+	if EncodingEnabled {
 		var segmentSize = int(math.Ceil(float64(len(value)) / float64(node.Segments)))
 		var segments = reedsolomon.AllocAligned(node.Segments+node.Parity, segmentSize)
 		var startIndex = 0
