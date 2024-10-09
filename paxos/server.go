@@ -353,7 +353,7 @@ func (node *Node) Accept(
 											}
 											client.mutex.Unlock()
 										}
-										fmt.Printf("Committed up to %d\n", next)
+										//fmt.Printf("Committed up to %d\n", next)
 									}
 								}
 							}
