@@ -24,6 +24,7 @@ type Node struct {
 	Clients       []Client
 	RequestWaiter sync.Map
 	RequestIds    sync.Map
+	LogWaiter     sync.Map
 	Total         int
 	Encoder       reedsolomon.Encoder
 	Entries       sync.Map
@@ -185,9 +186,8 @@ func (node *Node) Accept(
 						}
 						var entry *Entry
 						for {
-							value, exists := node.Entries.Load(current)
+							value, exists := node.Entries.LoadAndDelete(current)
 							if exists {
-								node.Entries.Delete(current)
 								entry = value.(*Entry)
 								break
 							} else {
@@ -198,21 +198,18 @@ func (node *Node) Accept(
 						CommitIndex = current
 
 						var requestId uuid.UUID
-						value, exists := node.RequestIds.Load(current)
+						value, exists := node.RequestIds.LoadAndDelete(current)
 						if !exists {
 							panic("BIG PROBLEM CAN'T FIND requestID")
 						}
-						node.RequestWaiter.Delete(current)
 
 						requestId = value.(uuid.UUID)
-						waiterValue, exists := node.RequestWaiter.Load(requestId)
+						waiterValue, exists := node.RequestWaiter.LoadAndDelete(requestId)
 						if exists {
 							channel := waiterValue.(chan struct{})
 							close(channel)
-							node.RequestWaiter.Delete(waiterValue)
 						}
 					}
-
 				}
 			}()
 
@@ -245,12 +242,13 @@ func (node *Node) Accept(
 							majority:  uint32(node.Quorum),
 							requestId: proposal.RequestId,
 						}
-						fmt.Printf("Got proposal for %d\n", proposal.Slot)
+						//fmt.Printf("Got proposal for %d\n", proposal.Slot)
 						//fmt.Printf("Aquiring lock for %d\n", proposal.Slot)
 						////node.Log.Lock.Lock()
 						//fmt.Printf("Got lock for %d\n", proposal.Slot)
 						node.RequestIds.Store(proposal.Slot, entry.requestId)
 						node.Entries.Store(proposal.Slot, entry)
+						node.LogWaiter.Load(proposal.Slot) // channel, close(channel)
 						//node.Log.Entries[proposal.Slot] = entry
 						//node.Log.Lock.Unlock()
 
@@ -277,13 +275,8 @@ func (node *Node) Accept(
 						slot := binary.LittleEndian.Uint32(buffer[1:])
 						fmt.Printf("Got ack for %d\n", slot)
 						go func() {
-							//fmt.Printf("Aquiring lock: %d\n", slot)
 							CommitLock.Lock()
-							//node.Log.Lock.Lock()
 							value, exists := node.Entries.Load(slot)
-							//node.Log.Lock.Unlock()
-
-							//acked := atomic.AddUint32(&entry.acked, 1)
 
 							if exists {
 								//fmt.Printf("Exists: %d\n", slot)
@@ -302,11 +295,10 @@ func (node *Node) Accept(
 										if atomic.LoadUint32(&nextEntry.acked) >= nextEntry.majority {
 											CommitIndex = next
 											etcdWrite(nextEntry.key, nextEntry.value)
-											waiterValue, exists := node.RequestWaiter.Load(nextEntry.requestId)
-											if exists {
+											waiterValue, waiterExists := node.RequestWaiter.LoadAndDelete(nextEntry.requestId)
+											if waiterExists {
 												channel := waiterValue.(chan struct{})
 												close(channel)
-												node.RequestWaiter.Delete(waiterValue)
 											} else {
 												panic("LEADER DIDNT HAVE REQUEST ID")
 											}
@@ -318,7 +310,7 @@ func (node *Node) Accept(
 									}
 
 									if start != CommitIndex {
-										fmt.Printf("Committing up to %d\n", CommitIndex)
+										//fmt.Printf("Committing up to %d\n", CommitIndex)
 										commitBuffer := make([]byte, 9)
 										binary.LittleEndian.PutUint32(commitBuffer[:4], 5)
 										commitBuffer[4] = OpCommit
