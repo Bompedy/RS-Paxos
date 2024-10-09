@@ -521,6 +521,7 @@ func (node *Node) ForwardWrite(
 	key []byte,
 	value []byte,
 ) {
+	fmt.Printf("Writing value :%d\n", value)
 	requestId := uuid.New()
 	if node.Index != node.Leader {
 		packet := ProposePacket{
