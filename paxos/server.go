@@ -798,8 +798,8 @@ func (node *Node) Write(
 		}
 
 		if string(restore) != string(value) {
-			fmt.Printf("Restore=%s\n", string(restore))
-			fmt.Printf("Real=%s\n", string(value))
+			fmt.Printf("1=%s\n\n", string(restore))
+			fmt.Printf("2=%s\n", string(value))
 			panic("They were different!")
 		}
 
