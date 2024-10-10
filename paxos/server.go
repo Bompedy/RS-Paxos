@@ -575,11 +575,13 @@ func (node *Node) Accept(
 						fullValue := fullValueValue.([]byte)
 						fullSize := len(fullValue)
 						segments := make([][]byte, node.Segments+node.Parity)
+
 						for i := uint32(1); i < node.Total; i++ {
 							value, ok := segmentMap[i].Load(keyString)
 							if ok {
 								fmt.Printf("Size of value before reconstruct: %d\n", len(value.([]byte)))
 								segments[i] = value.([]byte)
+
 							}
 						}
 						err := node.Encoder.Reconstruct(segments)
