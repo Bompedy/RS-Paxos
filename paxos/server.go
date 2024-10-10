@@ -332,7 +332,6 @@ func (node *Node) Accept(
 					}
 
 					if Failures && CommitIndex == FailSlot {
-
 						buf := make([]byte, 5)
 						binary.LittleEndian.PutUint32(buf[:4], 1)
 						buf[4] = OpReceivedFailSlot
