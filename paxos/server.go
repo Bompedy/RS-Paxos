@@ -410,7 +410,7 @@ func (node *Node) Accept(
 						}
 						node.RequestIds.Store(proposal.Slot, entry.requestId)
 						node.Entries.Store(proposal.Slot, entry)
-						fmt.Printf("Storing %d: %s=\n", node.Index, string(entry.value))
+						fmt.Printf("Storing at key=%s %d: %s=\n", string(entry.key), node.Index, string(entry.value))
 						node.Keys.Store(string(entry.key), entry.value)
 
 						value, exists := node.LogWaiter.LoadAndDelete(proposal.Slot)
