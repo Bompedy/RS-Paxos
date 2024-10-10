@@ -39,12 +39,13 @@ var ReconstructCount uint32
 //
 //var Encoder reedsolomon.Encoder
 
-var Failures = true
+// var Failures = true
 var Encoding = true
-var FailSlot = uint32(7000)
 var FailSlotAcks = uint32(0)
 
 type Node struct {
+	FailSlot           uint32
+	Failures           bool
 	Clients            []Client
 	Failed             []bool
 	Keys               sync.Map
@@ -330,7 +331,7 @@ func (node *Node) Accept(
 						}
 					}
 
-					if Failures && CommitIndex == FailSlot {
+					if node.Failures && CommitIndex == node.FailSlot {
 						fmt.Println("Reached fail slot")
 						buf := make([]byte, 5)
 						binary.LittleEndian.PutUint32(buf[:4], 1)
@@ -568,20 +569,21 @@ func (node *Node) Accept(
 						if loaded {
 							continue
 						}
-						segmentSize := len(v) - 4
-						fullSize := binary.LittleEndian.Uint32(v[segmentSize-4:])
+						segmentSize := len(v)
+						fullValue, _ := node.Keys.Load(key)
+						fullSize := len(fullValue.([]byte))
 						segments := make([][]byte, node.Segments+node.Parity)
 						for i := uint32(0); i < node.Total; i++ {
 							value, ok := segmentMap[i].Load(keyString)
 							if ok {
-								segments[i] = value.([]byte)[:segmentSize-4]
+								segments[i] = value.([]byte)
 							}
 						}
 						err := node.Encoder.Reconstruct(segments)
 						if err != nil {
 							panic("Couldnt reconstruct")
 						}
-						previous := v[:segmentSize-4]
+						previous := v
 						value := make([]byte, fullSize)
 						startIndex := 0
 						for i := range segments[:node.Segments] {
@@ -598,9 +600,7 @@ func (node *Node) Accept(
 							fmt.Printf("Value = %s\n", value)
 							panic("Reconstructed wrong value")
 						}
-						fullSizeBytes := make([]byte, 4)
-						binary.LittleEndian.PutUint32(fullSizeBytes, fullSize)
-						etcdWrite(key, append(value, fullSizeBytes...))
+						etcdWrite(key, value)
 						completed := atomic.AddUint32(&ReconstructCount, 1)
 						if completed == KeyCount {
 							close(ReconstructionWaiter)
@@ -609,7 +609,7 @@ func (node *Node) Accept(
 							panic("WHY DID WE HAVE MORE THAN KEYCOUNT")
 						}
 					} else if op == OpReceivedFailSlot {
-						if !Failures {
+						if !node.Failures {
 							panic("WHY DID WE GET A FAIL SLOT")
 						}
 						if !Encoding {
@@ -661,7 +661,7 @@ func (node *Node) Read(
 ) []byte {
 
 	appliedIndex := atomic.AddUint32(&AppliedIndex, 1)
-	if Failures && appliedIndex > FailSlot && node.Index == node.Leader {
+	if node.Failures && appliedIndex > node.FailSlot && node.Index == node.Leader {
 		<-ReconstructionWaiter
 	}
 
@@ -736,7 +736,7 @@ func (node *Node) Write(
 
 	appliedIndex := atomic.AddUint32(&AppliedIndex, 1)
 
-	if Failures && appliedIndex > FailSlot && node.Index == node.Leader {
+	if node.Failures && appliedIndex > node.FailSlot && node.Index == node.Leader {
 		<-ReconstructionWaiter
 	}
 
@@ -748,7 +748,7 @@ func (node *Node) Write(
 		requestId: requestId,
 		Type:      WriteType,
 	}
-	node.Keys.Store(string(key), appliedIndex)
+	node.Keys.Store(string(key), value)
 	node.Entries.Store(appliedIndex, entry)
 	channel := make(chan struct{})
 	node.WriteRequestWaiter.Store(requestId, channel)
@@ -776,14 +776,11 @@ func (node *Node) Write(
 			panic(err)
 		}
 
-		length := make([]byte, 4)
-		binary.LittleEndian.PutUint32(length, uint32(len(value)))
-
 		node.Broadcast(func(i uint32, client Client) {
 			go func(client Client) {
 				node.WriteProposePacket(client, ProposePacket{
 					Key:       key,
-					Value:     append(segments[client.index], length...),
+					Value:     segments[client.index],
 					Slot:      appliedIndex,
 					RequestId: requestId,
 					Type:      WriteType,
