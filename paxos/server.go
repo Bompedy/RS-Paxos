@@ -595,6 +595,7 @@ func (node *Node) Accept(
 						total := 0
 						for i := uint32(1); i < node.Total; i++ {
 							value, ok := segmentMap[i].Load(keyString)
+							fmt.Printf("Pulling out response=%s %d: %s=\n", keyString, i, string(value.([]byte)))
 							if ok {
 								total += 1
 								//fmt.Printf("Size of value before reconstruct: %d\n", len(value.([]byte)))
