@@ -612,7 +612,7 @@ func (node *Node) Accept(
 						if string(fullValue) != string(value) {
 							panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s\n%d=%s", len(keyString), keyString, len(fullValue), string(fullValue), len(value), string(value)))
 						}
-						//etcdWrite(key, value)
+						etcdWrite(key, value)
 						completed := atomic.AddUint32(&ReconstructCount, 1)
 						if completed == KeyCount {
 							println("Did we complete?")
