@@ -834,7 +834,7 @@ func (node *Node) Write(
 		//}
 		node.Broadcast(func(i uint32, client Client) {
 			//go func(client Client, segments [][]byte) {
-			fmt.Printf("Writing to %d: %s=\n", client.index, string(segments[client.index]))
+			fmt.Printf("Writing to key=%s size=%d: %s=\n", string(key), client.index, string(segments[client.index]))
 			node.WriteProposePacket(client, ProposePacket{
 				Key:       key,
 				Value:     segments[client.index],
