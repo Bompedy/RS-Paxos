@@ -532,11 +532,11 @@ func (node *Node) Accept(
 						node.Keys.Range(func(keyValue, value interface{}) bool {
 							keyString := keyValue.(string)
 							key := []byte(keyString)
-							shard := value.([]byte)
+							segment := value.([]byte)
 							//segment := etcdRead(key)
-							segment := shard
-							buf := make([]byte, 13+len(segment))
-							binary.LittleEndian.PutUint32(buf[:4], uint32(9+len(segment)))
+							//4 + 1 + 4 + len(
+							buf := make([]byte, 9+len(key)+len(segment))
+							binary.LittleEndian.PutUint32(buf[:4], uint32(5+len(key)+len(segment)))
 							buf[4] = OpSegmentResponse
 							binary.LittleEndian.PutUint32(buf[5:], uint32(len(key)))
 							copy(buf[9:], key)
