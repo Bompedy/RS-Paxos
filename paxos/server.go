@@ -543,7 +543,7 @@ func (node *Node) Accept(
 							binary.LittleEndian.PutUint32(buf[5:], uint32(len(key)))
 							copy(buf[9:], key)
 							copy(buf[9+len(key):], segment)
-							fmt.Printf("Writing: %d\n", len(segment))
+							fmt.Printf("Writing key=%s %d: %s=\n", keyString, node.Index, string(segment))
 							err := node.Clients[node.Leader].Write(buf)
 							if err != nil {
 								panic("ERROR SENDING SEGMENT BACK TO LEADER")
