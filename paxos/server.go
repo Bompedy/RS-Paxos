@@ -827,17 +827,17 @@ func (node *Node) Write(
 		//}
 
 		node.Broadcast(func(i uint32, client Client) {
-			go func(client Client) {
-				fmt.Printf("Writing to %d: %s=\n", client.index, string(segments[client.index]))
-				node.WriteProposePacket(client, ProposePacket{
-					Key:       key,
-					Value:     segments[client.index],
-					Slot:      appliedIndex,
-					RequestId: requestId,
-					Type:      WriteType,
-					Sender:    uint8(node.Index),
-				}, OpPropose)
-			}(client)
+			//go func(client Client, segments [][]byte) {
+			fmt.Printf("Writing to %d: %s=\n", client.index, string(segments[client.index]))
+			node.WriteProposePacket(client, ProposePacket{
+				Key:       key,
+				Value:     segments[client.index],
+				Slot:      appliedIndex,
+				RequestId: requestId,
+				Type:      WriteType,
+				Sender:    uint8(node.Index),
+			}, OpPropose)
+			//}(client, segments)
 		})
 	} else {
 		node.Broadcast(func(i uint32, client Client) {
