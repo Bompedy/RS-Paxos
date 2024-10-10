@@ -536,24 +536,26 @@ func (node *Node) Accept(
 						}
 					} else if op == OpSegment {
 						node.Keys.Range(func(keyValue, value interface{}) bool {
-							keyString := keyValue.(string)
-							key := []byte(keyString)
-							//segment := value.([]byte)
-							segment := etcdRead(key)
-							//4 + 1 + 4 + len(
-							buf := make([]byte, 9+len(key)+len(segment))
-							binary.LittleEndian.PutUint32(buf[:4], uint32(5+len(key)+len(segment)))
-							buf[4] = OpSegmentResponse
-							binary.LittleEndian.PutUint32(buf[5:], uint32(len(key)))
-							copy(buf[9:], key)
-							copy(buf[9+len(key):], segment)
-							client := node.Clients[node.Leader]
-							client.mutex.Lock()
-							err := client.Write(buf)
-							client.mutex.Unlock()
-							if err != nil {
-								panic("ERROR SENDING SEGMENT BACK TO LEADER")
-							}
+							go func() {
+								keyString := keyValue.(string)
+								key := []byte(keyString)
+								//segment := value.([]byte)
+								segment := etcdRead(key)
+								//4 + 1 + 4 + len(
+								buf := make([]byte, 9+len(key)+len(segment))
+								binary.LittleEndian.PutUint32(buf[:4], uint32(5+len(key)+len(segment)))
+								buf[4] = OpSegmentResponse
+								binary.LittleEndian.PutUint32(buf[5:], uint32(len(key)))
+								copy(buf[9:], key)
+								copy(buf[9+len(key):], segment)
+								client := node.Clients[node.Leader]
+								client.mutex.Lock()
+								err := client.Write(buf)
+								client.mutex.Unlock()
+								if err != nil {
+									panic("ERROR SENDING SEGMENT BACK TO LEADER")
+								}
+							}()
 							return true
 						})
 					} else if op == OpSegmentResponse {
