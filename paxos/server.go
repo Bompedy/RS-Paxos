@@ -563,63 +563,65 @@ func (node *Node) Accept(
 						segment := make([]byte, packetSize-(5+length))
 						copy(key, buffer[5:5+length])
 						copy(segment, buffer[5+length:packetSize])
-						keyString := string(key)
-						segmentMap[index].Store(keyString, segment)
-						count := 0
-						for i := uint32(1); i < node.Total; i++ {
-							_, ok := segmentMap[i].Load(keyString)
-							if ok {
-								count++
+						go func() {
+							keyString := string(key)
+							segmentMap[index].Store(keyString, segment)
+							count := 0
+							for i := uint32(1); i < node.Total; i++ {
+								_, ok := segmentMap[i].Load(keyString)
+								if ok {
+									count++
+								}
 							}
-						}
-						//a 1 2 3 4 5
-						if count < node.Segments {
-							continue
-						}
-						_, loaded := reconstructed.LoadOrStore(keyString, 0)
-						if loaded {
-							continue
-						}
-						segmentSize := len(segment)
-						fullSizeValue, _ := node.Keys.Load(keyString)
-						fullSize := fullSizeValue.(uint32)
-						segments := make([][]byte, node.Segments+node.Parity)
-						total := 0
-						for i := uint32(1); i < node.Total; i++ {
-							value, ok := segmentMap[i].Load(keyString)
-							if ok {
-								total += 1
-								segments[i] = value.([]byte)
+							//a 1 2 3 4 5
+							if count < node.Segments {
+								return
+							}
+							_, loaded := reconstructed.LoadOrStore(keyString, 0)
+							if loaded {
+								return
+							}
+							segmentSize := len(segment)
+							fullSizeValue, _ := node.Keys.Load(keyString)
+							fullSize := fullSizeValue.(uint32)
+							segments := make([][]byte, node.Segments+node.Parity)
+							total := 0
+							for i := uint32(1); i < node.Total; i++ {
+								value, ok := segmentMap[i].Load(keyString)
+								if ok {
+									total += 1
+									segments[i] = value.([]byte)
 
+								}
 							}
-						}
 
-						err = node.Encoder.Reconstruct(segments)
-						if err != nil {
-							panic("Couldnt reconstruct")
-						}
-						value := make([]byte, fullSize)
-						startIndex := 0
-						for i := range segments[:node.Segments] {
-							endIndex := startIndex + segmentSize
-							if endIndex > len(value) {
-								endIndex = len(value)
+							err = node.Encoder.Reconstruct(segments)
+							if err != nil {
+								panic("Couldnt reconstruct")
 							}
-							copy(value[startIndex:endIndex], segments[i])
-							startIndex = endIndex
-						}
-						//if string(fullValue) != string(value) {
-						//	panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s\n%d=%s", len(keyString), keyString, len(fullValue), string(fullValue), len(value), string(value)))
-						//}
-						etcdWrite(key, value)
-						completed := atomic.AddUint32(&ReconstructCount, 1)
-						if completed == KeyCount {
-							println("Did we complete?")
-							close(ReconstructionWaiter)
-						}
-						if completed > KeyCount {
-							panic("WHY DID WE HAVE MORE THAN KEYCOUNT")
-						}
+							value := make([]byte, fullSize)
+							startIndex := 0
+							for i := range segments[:node.Segments] {
+								endIndex := startIndex + segmentSize
+								if endIndex > len(value) {
+									endIndex = len(value)
+								}
+								copy(value[startIndex:endIndex], segments[i])
+								startIndex = endIndex
+							}
+							//if string(fullValue) != string(value) {
+							//	panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s\n%d=%s", len(keyString), keyString, len(fullValue), string(fullValue), len(value), string(value)))
+							//}
+							etcdWrite(key, value)
+							completed := atomic.AddUint32(&ReconstructCount, 1)
+							if completed == KeyCount {
+								println("Completed reconstruction!")
+								close(ReconstructionWaiter)
+							}
+							if completed > KeyCount {
+								panic("WHY DID WE HAVE MORE THAN KEYCOUNT")
+							}
+						}()
 					} else if op == OpReceivedFailSlot {
 						if !node.Failures {
 							panic("WHY DID WE GET A FAIL SLOT")
