@@ -563,10 +563,13 @@ func (node *Node) Accept(
 						testLock.Lock()
 						//fmt.Println("Got op segment response")
 						length := binary.LittleEndian.Uint32(buffer[1:5])
-						key := buffer[5 : 5+length]
-						keyString := string(key)
+
+						key := make([]byte, length)
 						//fmt.Printf("Got length: keyLength=%d packetSize=%d segment=%d\n", length, packetSize, packetSize-(5+length))
-						segment := buffer[5+length : packetSize]
+						segment := make([]byte, packetSize-(5+length))
+						copy(key, buffer[5:5+length])
+						copy(segment, buffer[5+length:packetSize])
+						keyString := string(key)
 						fmt.Printf("Response at key=%s %d: %s=\n", keyString, index, string(segment))
 						segmentMap[index].Store(keyString, segment)
 						count := 0
