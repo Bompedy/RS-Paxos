@@ -777,6 +777,32 @@ func (node *Node) Write(
 			panic(err)
 		}
 
+		segments[0] = nil
+		segments[1] = nil
+
+		err = node.Encoder.Reconstruct(segments)
+		if err != nil {
+			panic(err)
+		}
+
+		restore := make([]byte, segmentSize*(node.Segments+node.Parity))
+		startIndex = 0
+
+		for i := range segments[:node.Segments] {
+			endIndex := startIndex + segmentSize
+			if endIndex > len(restore) {
+				endIndex = len(restore)
+			}
+			copy(restore[startIndex:endIndex], segments[i])
+			startIndex = endIndex
+		}
+
+		if string(restore) != string(value) {
+			fmt.Printf("Restore=%s\n", string(restore))
+			fmt.Printf("Real=%s\n", string(value))
+			panic("They were different!")
+		}
+
 		node.Broadcast(func(i uint32, client Client) {
 			go func(client Client) {
 				node.WriteProposePacket(client, ProposePacket{
