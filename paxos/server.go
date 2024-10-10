@@ -825,7 +825,9 @@ func (node *Node) Write(
 		//
 		//	panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s", len(restore), string(restore), len(value), string(value)))
 		//}
-
+		for i := uint32(0); i < node.Total; i++ {
+			fmt.Printf("Segment %d: %s=\n", i, string(segments[i]))
+		}
 		node.Broadcast(func(i uint32, client Client) {
 			//go func(client Client, segments [][]byte) {
 			fmt.Printf("Writing to %d: %s=\n", client.index, string(segments[client.index]))
