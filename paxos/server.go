@@ -600,6 +600,8 @@ func (node *Node) Accept(
 							//fmt.Printf("Full Value = %s\n", fullValue)
 							//fmt.Printf("Value = %s\n", value)
 							panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s", len(fullValue), string(fullValue), len(value), string(value)))
+						} else {
+							fmt.Printf("We got some that were correct?\n")
 						}
 						etcdWrite(key, value)
 						completed := atomic.AddUint32(&ReconstructCount, 1)
