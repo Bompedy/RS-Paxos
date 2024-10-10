@@ -16,35 +16,52 @@ var OpCommit = uint8(1)
 var OpForward = uint8(2)
 var OpAck = uint8(3)
 var OpRead = uint8(4)
-var OpElection = uint8(5)
-var OpVote = uint8(6)
+var OpSegment = uint8(5)
+var OpSegmentResponse = uint8(6)
+var OpReceivedFailSlot = uint8(7)
 
-// var OpElectionResponse = uint8(5)
-var OpHeartbeat = uint8(6)
+//var OpElection = uint8(5)
+//var OpElectionResponse = uint8(6)
 
 var ReadType = uint8(0)
 var WriteType = uint8(1)
 
+var ReconstructionWaiter = make(chan struct{})
+
 var CommitIndex uint32
 var AppliedIndex uint32
+
+var KeyCount uint32
+var ReconstructCount uint32
+
+//var Segments [][]byte
+//var SegmentResponses uint32
+//
+//var Encoder reedsolomon.Encoder
+
+var Failures = false
+var Encoding = true
+var FailSlot = uint32(100)
+var FailSlotAcks = uint32(0)
 
 type Node struct {
 	Clients            []Client
 	Failed             []bool
+	Reconstructor      sync.Map
 	Keys               sync.Map
 	ReadRequestWaiter  sync.Map
 	ReadSenders        sync.Map
 	WriteRequestWaiter sync.Map
 	RequestIds         sync.Map
 	LogWaiter          sync.Map
-	Total              int
+	Total              uint32
 	Encoder            reedsolomon.Encoder
 	Entries            sync.Map
 	Quorum             int
 	Parity             int
 	Segments           int
-	Index              int
-	Leader             int
+	Index              uint32
+	Leader             uint32
 }
 
 type Entry struct {
@@ -68,6 +85,29 @@ type ProposePacket struct {
 type ReadResult struct {
 	requestId uuid.UUID
 	value     []byte
+}
+
+func (node *Node) BroadcastWrite(buffer []byte) {
+	for i := uint32(0); i < node.Total; i++ {
+		if i == node.Index || node.Failed[i] {
+			continue
+		}
+		go func(client Client) {
+			err := client.Write(buffer)
+			if err != nil {
+				panic("SHUTDOWN")
+			}
+		}(node.Clients[i])
+	}
+}
+
+func (node *Node) Broadcast(block func(uint32, Client)) {
+	for i := uint32(0); i < node.Total; i++ {
+		if i == node.Index || node.Failed[i] {
+			continue
+		}
+		block(i, node.Clients[i])
+	}
 }
 
 func GetProposePacket(buffer []byte) ProposePacket {
@@ -116,14 +156,46 @@ func (node *Node) WriteProposePacket(client Client, packet ProposePacket, op uin
 	err := client.Write(buffer)
 	client.mutex.Unlock()
 	if err != nil {
-		if client.index == uint32(node.Leader) {
-			println("setting new leader!")
-			node.Leader = 1
-		}
-		node.Failed[client.index] = true
-		//panic("error forwarding to leader!")
+		panic("SHUTDOWN")
 	}
 }
+
+//func (node *Node) RepairAndReconstruct() {
+//	current := atomic.LoadUint32(&CommitIndex)
+//	if current != FailSlot {
+//		panic("it was different than the fialed slot!!!")
+//	}
+//
+//	//if current > HighestIndex {
+//	//	HighestIndex = current
+//	//}
+//	//if current < LowestIndex {
+//	//	LowestIndex = current
+//	//}
+//	//
+//	//if atomic.LoadUint32(&CommitIndex) != current {
+//	//	panic("SOMEHOW CHANGED?")
+//	//}
+//	//
+//	//for _, client := range node.Clients {
+//	//	if ElectionResponses[clientIndex] == -1 {
+//	//		continue
+//	//	}
+//	//	for slot := uint32(ElectionResponses[clientIndex] + 1); slot < HighestIndex; slot++ {
+//	//		buf := make([]byte, 9)
+//	//		binary.LittleEndian.PutUint32(buf[:4], uint32(5))
+//	//		buf[4] = OpSegment
+//	//		binary.LittleEndian.PutUint32(buf[5:], slot)
+//	//		client.mutex.Lock()
+//	//		err = client.Write(buf)
+//	//		client.mutex.Unlock()
+//	//		if err != nil {
+//	//			node.Fail(client)
+//	//		}
+//	//	}
+//	//}
+//
+//}
 
 func (node *Node) WriteReadPacket(client Client, value []byte, requestId uuid.UUID) {
 	size := 17 + len(value)
@@ -138,11 +210,7 @@ func (node *Node) WriteReadPacket(client Client, value []byte, requestId uuid.UU
 	err := client.Write(buffer)
 	client.mutex.Unlock()
 	if err != nil {
-		if client.index == uint32(node.Leader) {
-			println("setting new leader!")
-			node.Leader = 1
-		}
-		node.Failed[client.index] = true
+		panic("SHUTDOWN")
 	}
 }
 
@@ -187,51 +255,12 @@ func (node *Node) Connect(
 	}
 
 	waiter.Wait()
-
-	//go func() {
-	//	for {
-	//		buffer := make([]byte, 9)
-	//		binary.LittleEndian.PutUint32(buffer[:4], 9)
-	//		buffer[4] = OpHeartbeat
-	//		binary.LittleEndian.PutUint32(buffer[5:9], atomic.LoadUint32(&CommitIndex))
-	//
-	//		for i := range node.Clients {
-	//			client := node.Clients[i]
-	//			client.mutex.Lock()
-	//			err := client.Write(buffer)
-	//			client.mutex.Unlock()
-	//			if err != nil {
-	//				node.Failed[i] = true
-	//				break
-	//			}
-	//		}
-	//
-	//		time.Sleep(time.Duration(rand.Intn(75)+100) * time.Millisecond)
-	//	}
-	//}()
-	//
-	//go func() {
-	//	buffer := make([]byte, 9)
-	//	for i := range node.Clients {
-	//		i := i
-	//		go func(client Client) {
-	//			for {
-	//				err := client.Read(buffer)
-	//				if err != nil {
-	//					node.Failed[i] = true
-	//					break
-	//				}
-	//
-	//				commitIndex := binary.LittleEndian.Uint32(buffer[5:9])
-	//				if node.Failed[node.Leader] && commitIndex < atomic.LoadUint32(&CommitIndex) {
-	//					node.Leader = i
-	//				}
-	//			}
-	//		}(node.Clients[i])
-	//	}
-	//}()
-
 	return nil
+}
+
+type CommitResult struct {
+	Type  uint8
+	Index uint32
 }
 
 func (node *Node) Accept(
@@ -245,6 +274,88 @@ func (node *Node) Accept(
 		if err != nil {
 			continue
 		}
+
+		commitChannel := make(chan uint32, 4096)
+		readChannel := make(chan ReadResult, 4096)
+		var segmentMap = make([]sync.Map, node.Total)
+		var reconstructed = sync.Map{}
+		for i := uint32(0); i < node.Total; i++ {
+			segmentMap[i] = sync.Map{}
+		}
+
+		go func() {
+			for next := range commitChannel {
+				if next > CommitIndex+2048 {
+					panic("GOT TOO FAR APART")
+					next = CommitIndex + 2048
+				}
+				for {
+					current := CommitIndex + 1
+					if current > next {
+						break
+					}
+					var entry *Entry
+					for {
+						value, exists := node.Entries.LoadAndDelete(current)
+						if exists {
+							entry = value.(*Entry)
+							break
+						} else {
+							logWaiterValue, logWaiterExists := node.LogWaiter.Load(current)
+							if logWaiterExists {
+								<-logWaiterValue.(chan struct{})
+							} else {
+								node.LogWaiter.Store(current, make(chan struct{}))
+							}
+							fmt.Printf("we are so stuck on %d\n", current)
+						}
+					}
+
+					node.LogWaiter.Delete(current)
+					CommitIndex = current
+
+					var requestId uuid.UUID
+					value, exists := node.RequestIds.LoadAndDelete(current)
+					if !exists {
+						fmt.Printf("CANT FIND ID FOR: %d\n", current)
+						panic("BIG PROBLEM CAN'T FIND WRITE requestID")
+					}
+
+					if entry.Type == WriteType {
+						etcdWrite(entry.key, entry.value)
+						requestId = value.(uuid.UUID)
+						waiterValue, exists := node.WriteRequestWaiter.LoadAndDelete(requestId)
+						if exists {
+							channel := waiterValue.(chan struct{})
+							close(channel)
+						}
+					}
+
+					if Failures && CommitIndex == FailSlot {
+
+						buf := make([]byte, 5)
+						binary.LittleEndian.PutUint32(buf[:4], 1)
+						buf[4] = OpReceivedFailSlot
+						err := node.Clients[node.Leader].Write(buf)
+						if err != nil {
+							panic("shouldnt error on write")
+						}
+					}
+				}
+			}
+		}()
+
+		go func() {
+			for readResult := range readChannel {
+				value, exists := node.ReadRequestWaiter.LoadAndDelete(readResult.requestId)
+				if !exists {
+					panic("BIG PROBLEM CAN'T FIND READ requestID")
+				}
+				channel := value.(chan []byte)
+				channel <- readResult.value
+				close(channel)
+			}
+		}()
 
 		for {
 			connection, err := listener.Accept()
@@ -262,72 +373,9 @@ func (node *Node) Accept(
 				panic("Error reading index!")
 			}
 			index := uint32(indexBuffer[0])
-
-			commitChannel := make(chan uint32, 4096)
-			readChannel := make(chan ReadResult, 4096)
-
-			go func() {
-				for next := range commitChannel {
-					if next > CommitIndex+2048 {
-						panic("GOT TOO FAR APART")
-						next = CommitIndex + 2048
-					}
-					for {
-						current := CommitIndex + 1
-						if current > next {
-							break
-						}
-						var entry *Entry
-						for {
-							value, exists := node.Entries.LoadAndDelete(current)
-							if exists {
-								entry = value.(*Entry)
-								break
-							} else {
-								logWaiterValue, logWaiterExists := node.LogWaiter.Load(current)
-								if logWaiterExists {
-									<-logWaiterValue.(chan struct{})
-								} else {
-									node.LogWaiter.Store(current, make(chan struct{}))
-								}
-								fmt.Printf("we are so stuck on %d\n", current)
-							}
-						}
-
-						node.LogWaiter.Delete(current)
-						CommitIndex = current
-
-						var requestId uuid.UUID
-						value, exists := node.RequestIds.LoadAndDelete(current)
-						if !exists {
-							fmt.Printf("CANT FIND ID FOR: %d\n", current)
-							panic("BIG PROBLEM CAN'T FIND WRITE requestID")
-						}
-
-						if entry.Type == WriteType {
-							etcdWrite(entry.key, entry.value)
-							requestId = value.(uuid.UUID)
-							waiterValue, exists := node.WriteRequestWaiter.LoadAndDelete(requestId)
-							if exists {
-								channel := waiterValue.(chan struct{})
-								close(channel)
-							}
-						}
-					}
-				}
-			}()
-
-			go func() {
-				for readResult := range readChannel {
-					value, exists := node.ReadRequestWaiter.LoadAndDelete(readResult.requestId)
-					if !exists {
-						panic("BIG PROBLEM CAN'T FIND READ requestID")
-					}
-					channel := value.(chan []byte)
-					channel <- readResult.value
-					close(channel)
-				}
-			}()
+			//
+			//commitChannel := make(chan CommitResult, 4096)
+			//readChannel := make(chan ReadResult, 4096)
 
 			go func() {
 				sizeBuffer := make([]byte, 4)
@@ -335,11 +383,7 @@ func (node *Node) Accept(
 				for {
 					err := reader.Read(sizeBuffer)
 					if err != nil {
-						if index == uint32(node.Leader) {
-							println("setting new leader!")
-							node.Leader = 1
-						}
-						node.Failed[index] = true
+						panic("SHUTDOWN")
 					}
 					packetSize := binary.LittleEndian.Uint32(sizeBuffer[:4])
 					if packetSize > uint32(len(buffer)) {
@@ -348,11 +392,7 @@ func (node *Node) Accept(
 
 					err = reader.Read(buffer[:packetSize])
 					if err != nil {
-						if index == uint32(node.Leader) {
-							println("setting new leader!")
-							node.Leader = 1
-						}
-						node.Failed[index] = true
+						panic("SHUTDOWN")
 					}
 
 					op := buffer[0]
@@ -385,16 +425,13 @@ func (node *Node) Accept(
 							err = client.Write(response)
 							client.mutex.Unlock()
 							if err != nil {
-								if index == uint32(node.Leader) {
-									fmt.Printf("LEADER IS DOWN")
-								} else {
-									node.Failed[index] = true
-									fmt.Printf("Follower went down")
-								}
-								//panic(err)
+								panic("SHUTDOWN")
 							}
 						}()
 					} else if op == OpForward {
+						if node.Index != atomic.LoadUint32(&node.Leader) {
+							panic("NON LEADER GOT FORWARD")
+						}
 						forward := GetProposePacket(buffer[1:])
 						go func() {
 							if forward.Type == ReadType {
@@ -404,6 +441,10 @@ func (node *Node) Accept(
 							}
 						}()
 					} else if op == OpAck {
+						if node.Index != atomic.LoadUint32(&node.Leader) {
+							panic("NON LEADER GOT ACK")
+						}
+
 						slot := binary.LittleEndian.Uint32(buffer[1:])
 						go func() {
 							value, exists := node.Entries.Load(slot)
@@ -468,24 +509,7 @@ func (node *Node) Accept(
 										binary.LittleEndian.PutUint32(commitBuffer[:4], 5)
 										commitBuffer[4] = OpCommit
 										binary.LittleEndian.PutUint32(commitBuffer[5:9], next)
-
-										for i := 0; i < node.Total; i++ {
-											if i == node.Index || node.Failed[i] {
-												continue
-											}
-											client := node.Clients[i]
-											client.mutex.Lock()
-											err := client.Write(commitBuffer)
-											client.mutex.Unlock()
-											if err != nil {
-												if i == node.Leader {
-													println("setting new leader!")
-													node.Leader = 1
-												}
-
-												node.Failed[i] = true
-											}
-										}
+										node.BroadcastWrite(commitBuffer)
 									}
 								}
 							}
@@ -503,36 +527,96 @@ func (node *Node) Accept(
 							copy(value, buffer[17:packetSize])
 							readChannel <- ReadResult{requestId: requestId, value: value}
 						}
-					} else if op == OpElection {
-						//current := atomic.LoadUint32(&CommitIndex)
-						//commitIndex := binary.LittleEndian.Uint32(buffer[1:])
-						//electionBuffer := make([]byte, 9)
-						//binary.LittleEndian.PutUint32(electionBuffer[:4], 5)
-						//electionBuffer[4] = OpElection
-						//binary.LittleEndian.PutUint32(electionBuffer[5:9], current)
-						//
-						//// 5
-						//// 4
-						//// 5
-						//// 3
-						//
-						//for i := 0; i < node.Total; i++ {
-						//	if i == node.Index || node.Failed[i] {
-						//		continue
-						//	}
-						//	client := node.Clients[i]
-						//	client.mutex.Lock()
-						//	err := client.Write(commitBuffer)
-						//	client.mutex.Unlock()
-						//	if err != nil {
-						//		node.Failed[i] = true
-						//		if i == node.Leader {
-						//			node.Leader = 1
-						//		}
-						//	}
-						//}
-					} else if op == OpVote {
+					} else if op == OpSegment {
+						keyCount := uint32(0)
+						node.Keys.Range(func(keyValue, value interface{}) bool {
+							key := keyValue.([]byte)
+							segment := etcdRead(key)
+							buf := make([]byte, 13+len(segment))
+							binary.LittleEndian.PutUint32(buf[:4], uint32(9+len(segment)))
+							buf[4] = OpSegmentResponse
+							binary.LittleEndian.PutUint32(buf[5:], uint32(len(key)))
+							copy(buf[9:], key)
+							copy(buf[9+len(key):], segment)
+							err := node.Clients[node.Leader].Write(buf)
+							if err != nil {
+								panic("ERROR SENDING SEGMENT BACK TO LEADER")
+							}
+							keyCount++
+							return true
+						})
+						atomic.StoreUint32(&KeyCount, keyCount)
+					} else if op == OpSegmentResponse {
+						length := binary.LittleEndian.Uint32(buffer[1:])
+						key := buffer[5 : 5+length]
+						v := buffer[5+length:]
+						segmentMap[index].Store(key, v)
+						count := 0
+						for i := uint32(0); i < node.Total; i++ {
+							_, ok := segmentMap[i].Load(key)
+							if ok {
+								count++
+							}
+						}
+						if count < node.Segments {
+							continue
+						}
+						_, loaded := reconstructed.LoadOrStore(key, 0)
+						if loaded {
+							continue
+						}
+						segmentSize := len(v) - 4
+						fullSize := binary.LittleEndian.Uint32(v[segmentSize-4:])
+						segments := make([][]byte, node.Segments+node.Parity)
+						for i := uint32(0); i < node.Total; i++ {
+							value, ok := segmentMap[i].Load(key)
+							if ok {
+								segments[i] = value.([]byte)[:segmentSize-4]
+							}
+						}
+						err := node.Encoder.Reconstruct(segments)
+						if err != nil {
+							panic("Couldnt reconstruct")
+						}
+						previous := v[:segmentSize-4]
+						value := make([]byte, fullSize)
+						startIndex := 0
+						for i := range segments[:node.Segments] {
+							endIndex := startIndex + segmentSize
+							if endIndex > len(value) {
+								endIndex = len(value)
+							}
+							copy(value[startIndex:endIndex], segments[i])
+							startIndex = endIndex
+						}
+						if string(previous) != string(value) {
+							panic("Reconstructed wrong value")
+						}
+						fullSizeBytes := make([]byte, 4)
+						binary.LittleEndian.PutUint32(fullSizeBytes, fullSize)
+						etcdWrite(key, append(value, fullSizeBytes...))
+						completed := atomic.AddUint32(&ReconstructCount, 1)
+						if completed == KeyCount {
+							close(ReconstructionWaiter)
+						}
+						if completed > KeyCount {
+							panic("WHY DID WE HAVE MORE THAN KEYCOUNT")
+						}
+					} else if op == OpReceivedFailSlot {
+						if !Failures {
+							panic("WHY DID WE GET A FAIL SLOT")
+						}
 
+						if Encoding {
+							panic("WE ONLY SUPPORT FAILURES WITH ENCODING")
+						}
+
+						if atomic.AddUint32(&FailSlotAcks, 1) == (node.Total - 1) {
+							buf := make([]byte, 9)
+							binary.LittleEndian.PutUint32(buf[:4], 5)
+							buf[4] = OpSegment
+							node.BroadcastWrite(buf)
+						}
 					}
 				}
 			}()
@@ -544,7 +628,8 @@ func (node *Node) ForwardRead(
 	key []byte,
 ) []byte {
 	requestId := uuid.New()
-	if node.Index != node.Leader {
+	leader := atomic.LoadUint32(&node.Leader)
+	if node.Index != leader {
 		channel := make(chan []byte)
 		node.ReadRequestWaiter.Store(requestId, channel)
 		packet := ProposePacket{
@@ -555,7 +640,8 @@ func (node *Node) ForwardRead(
 			Type:      ReadType,
 			Sender:    uint8(node.Index),
 		}
-		node.WriteProposePacket(node.Clients[node.Leader], packet, OpForward)
+
+		node.WriteProposePacket(node.Clients[leader], packet, OpForward)
 		return <-channel
 	}
 
@@ -568,6 +654,7 @@ func (node *Node) Read(
 	requestId uuid.UUID,
 	sender uint8,
 ) []byte {
+
 	channel := make(chan []byte)
 	node.ReadRequestWaiter.Store(requestId, channel)
 	node.ReadSenders.Store(requestId, sender)
@@ -591,15 +678,12 @@ func (node *Node) Read(
 	}
 
 	node.Entries.Store(appliedIndex, entry)
-	for i := 0; i < node.Total; i++ {
-		if i == node.Index || node.Failed[i] {
-			continue
-		}
-		i := i
+
+	node.Broadcast(func(i uint32, client Client) {
 		go func(client Client) {
 			node.WriteProposePacket(client, packet, OpPropose)
 		}(node.Clients[i])
-	}
+	})
 
 	if wait {
 		return <-channel
@@ -613,7 +697,8 @@ func (node *Node) ForwardWrite(
 	value []byte,
 ) {
 	requestId := uuid.New()
-	if node.Index != node.Leader {
+	leader := atomic.LoadUint32(&node.Leader)
+	if node.Index != leader {
 		packet := ProposePacket{
 			Slot:      0,
 			RequestId: requestId,
@@ -625,14 +710,13 @@ func (node *Node) ForwardWrite(
 
 		channel := make(chan struct{})
 		node.WriteRequestWaiter.Store(requestId, channel)
-		node.WriteProposePacket(node.Clients[node.Leader], packet, OpForward)
+
+		node.WriteProposePacket(node.Clients[leader], packet, OpForward)
 		<-channel
 	} else {
 		node.Write(key, value, true, requestId)
 	}
 }
-
-var EncodingEnabled = false
 
 func (node *Node) Write(
 	key []byte,
@@ -642,6 +726,11 @@ func (node *Node) Write(
 ) {
 
 	appliedIndex := atomic.AddUint32(&AppliedIndex, 1)
+
+	if Failures && appliedIndex > FailSlot && node.Index == 0 {
+		<-ReconstructionWaiter
+	}
+
 	entry := &Entry{
 		key:       key,
 		value:     value,
@@ -650,11 +739,12 @@ func (node *Node) Write(
 		requestId: requestId,
 		Type:      WriteType,
 	}
+	node.Keys.Store(appliedIndex, key)
 	node.Entries.Store(appliedIndex, entry)
 	channel := make(chan struct{})
 	node.WriteRequestWaiter.Store(requestId, channel)
 
-	if EncodingEnabled {
+	if Encoding {
 		var segmentSize = int(math.Ceil(float64(len(value)) / float64(node.Segments)))
 		var segments = reedsolomon.AllocAligned(node.Segments+node.Parity, segmentSize)
 		var startIndex = 0
@@ -677,28 +767,23 @@ func (node *Node) Write(
 			panic(err)
 		}
 
-		for i := 0; i < node.Total; i++ {
-			if i == node.Index || node.Failed[i] {
-				continue
-			}
-			i := i
+		length := make([]byte, 4)
+		binary.LittleEndian.PutUint32(length, uint32(len(value)))
+
+		node.Broadcast(func(i uint32, client Client) {
 			go func(client Client) {
 				node.WriteProposePacket(client, ProposePacket{
 					Key:       key,
-					Value:     segments[client.index],
+					Value:     append(segments[client.index], length...),
 					Slot:      appliedIndex,
 					RequestId: requestId,
 					Type:      WriteType,
 					Sender:    uint8(node.Index),
 				}, OpPropose)
 			}(node.Clients[i])
-		}
+		})
 	} else {
-		for i := 0; i < node.Total; i++ {
-			if i == node.Index || node.Failed[i] {
-				continue
-			}
-			i := i
+		node.Broadcast(func(i uint32, client Client) {
 			go func(client Client) {
 				node.WriteProposePacket(client, ProposePacket{
 					Key:       key,
@@ -709,7 +794,7 @@ func (node *Node) Write(
 					Sender:    uint8(node.Index),
 				}, OpPropose)
 			}(node.Clients[i])
-		}
+		})
 	}
 
 	if wait {
