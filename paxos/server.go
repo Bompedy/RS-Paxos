@@ -788,6 +788,7 @@ func (node *Node) Write(
 
 	if Encoding {
 		var segmentSize = int(math.Ceil(float64(len(value)) / float64(node.Segments)))
+		newEncoder, err := reedsolomon.New(node.Segments, node.Parity)
 		var segments = reedsolomon.AllocAligned(node.Segments+node.Parity, segmentSize)
 		var startIndex = 0
 		for i := range segments[:node.Segments] {
@@ -799,12 +800,12 @@ func (node *Node) Write(
 			startIndex = endIndex
 		}
 
-		err := node.Encoder.Encode(segments)
+		err = newEncoder.Encode(segments)
 		if err != nil {
 			panic(err)
 		}
 
-		ok, err := node.Encoder.Verify(segments)
+		ok, err := newEncoder.Verify(segments)
 		if err != nil || !ok {
 			panic(err)
 		}
