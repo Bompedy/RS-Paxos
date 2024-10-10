@@ -553,7 +553,7 @@ func (node *Node) Accept(
 						length := binary.LittleEndian.Uint32(buffer[1:5])
 						key := buffer[5 : 5+length]
 						keyString := string(key)
-						fmt.Printf("Got length: keyLength=%d packetSize=%d segment=%d\n", length, packetSize, packetSize-(5+length))
+						//fmt.Printf("Got length: keyLength=%d packetSize=%d segment=%d\n", length, packetSize, packetSize-(5+length))
 						segment := buffer[5+length : packetSize]
 						segmentMap[index].Store(keyString, segment)
 						count := 0
@@ -579,7 +579,7 @@ func (node *Node) Accept(
 						for i := uint32(1); i < node.Total; i++ {
 							value, ok := segmentMap[i].Load(keyString)
 							if ok {
-								fmt.Printf("Size of value before reconstruct: %d\n", len(value.([]byte)))
+								//fmt.Printf("Size of value before reconstruct: %d\n", len(value.([]byte)))
 								segments[i] = value.([]byte)
 
 							}
@@ -601,13 +601,14 @@ func (node *Node) Accept(
 						if string(fullValue) != string(value) {
 							//fmt.Printf("Full Value = %s\n", fullValue)
 							//fmt.Printf("Value = %s\n", value)
-							panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s", len(fullValue), string(fullValue), len(value), string(value)))
+							panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s\n%d=%s", len(keyString), keyString, len(fullValue), string(fullValue), len(value), string(value)))
 						} else {
 							fmt.Printf("We got some that were correct?\n")
 						}
 						etcdWrite(key, value)
 						completed := atomic.AddUint32(&ReconstructCount, 1)
 						if completed == KeyCount {
+							println("Did we complete?")
 							close(ReconstructionWaiter)
 						}
 						if completed > KeyCount {
