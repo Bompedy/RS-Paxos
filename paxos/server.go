@@ -597,8 +597,8 @@ func (node *Node) Accept(
 							startIndex = endIndex
 						}
 						if string(fullValue) != string(value) {
-							fmt.Printf("Full Value = %s\n", fullValue)
-							fmt.Printf("Value = %s\n", value)
+							//fmt.Printf("Full Value = %s\n", fullValue)
+							//fmt.Printf("Value = %s\n", value)
 							panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s", len(fullValue), string(fullValue), len(value), string(value)))
 						}
 						etcdWrite(key, value)
