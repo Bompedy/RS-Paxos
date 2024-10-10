@@ -408,7 +408,7 @@ func (node *Node) Accept(
 						}
 						node.RequestIds.Store(proposal.Slot, entry.requestId)
 						node.Entries.Store(proposal.Slot, entry)
-						fmt.Printf("Storing: %d\n", len(entry.value))
+						fmt.Printf("Storing %d: %s=\n", node.Index, string(entry.value))
 						node.Keys.Store(string(entry.key), entry.value)
 
 						value, exists := node.LogWaiter.LoadAndDelete(proposal.Slot)
@@ -828,7 +828,7 @@ func (node *Node) Write(
 
 		node.Broadcast(func(i uint32, client Client) {
 			go func(client Client) {
-				//fmt.Printf("Writing: %d\n", len(segments[client.index]))
+				fmt.Printf("Writing to %d: %s=\n", client.index, string(segments[client.index]))
 				node.WriteProposePacket(client, ProposePacket{
 					Key:       key,
 					Value:     segments[client.index],
