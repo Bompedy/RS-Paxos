@@ -577,10 +577,11 @@ func (node *Node) Accept(
 						fullSize := len(fullValue)
 						segments := make([][]byte, node.Segments+node.Parity)
 						segments[0] = nil
-
+						total := 0
 						for i := uint32(1); i < node.Total; i++ {
 							value, ok := segmentMap[i].Load(keyString)
 							if ok {
+								total += 1
 								//fmt.Printf("Size of value before reconstruct: %d\n", len(value.([]byte)))
 								segments[i] = value.([]byte)
 
@@ -588,6 +589,8 @@ func (node *Node) Accept(
 								segments[i] = nil
 							}
 						}
+
+						fmt.Printf("Got total segments: %d\n", total)
 
 						newEncoder, err := reedsolomon.New(node.Segments, node.Parity)
 						if err != nil {
