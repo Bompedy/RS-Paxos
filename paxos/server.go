@@ -798,9 +798,7 @@ func (node *Node) Write(
 		}
 
 		if string(restore) != string(value) {
-			fmt.Printf("1=%s\n\n", string(restore))
-			fmt.Printf("2=%s\n", string(value))
-			panic("They were different!")
+			panic(fmt.Errorf("they were different!\n1=%s\n2=%s", string(restore), string(value)))
 		}
 
 		node.Broadcast(func(i uint32, client Client) {
