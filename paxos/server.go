@@ -791,7 +791,6 @@ func (node *Node) Write(
 
 	if Encoding {
 		var segmentSize = int(math.Ceil(float64(len(value)) / float64(node.Segments)))
-		//newEncoder, err := reedsolomon.New(node.Segments, node.Parity)
 		var segments = reedsolomon.AllocAligned(node.Segments+node.Parity, segmentSize)
 		var startIndex = 0
 		for i := range segments[:node.Segments] {
@@ -807,34 +806,8 @@ func (node *Node) Write(
 		if err != nil || !ok {
 			panic(err)
 		}
-		//
-		//segments[0] = nil
-		//segments[1] = nil
-		//
-		//err = node.Encoder.Reconstruct(segments)
-		//if err != nil {
-		//	panic(err)
-		//}
-		//
-		//restore := make([]byte, len(value))
-		//startIndex = 0
-		//
-		//for i := range segments[:node.Segments] {
-		//	endIndex := startIndex + segmentSize
-		//	if endIndex > len(restore) {
-		//		endIndex = len(restore)
-		//	}
-		//	copy(restore[startIndex:endIndex], segments[i])
-		//	startIndex = endIndex
-		//}
-		//
-		//if string(restore) != string(value) {
-		//
-		//	panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s", len(restore), string(restore), len(value), string(value)))
-		//}
 		node.Broadcast(func(i uint32, client Client) {
 			go func(client Client, segments [][]byte) {
-				//fmt.Printf("Writing to key=%s size=%d: %s=\n", string(key), client.index, string(segments[client.index]))
 				node.WriteProposePacket(client, ProposePacket{
 					Key:       key,
 					Value:     segments[client.index],
@@ -859,8 +832,6 @@ func (node *Node) Write(
 			}(client)
 		})
 	}
-
-	//writeLock.Unlock()
 
 	if wait {
 		<-channel
