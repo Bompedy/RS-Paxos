@@ -566,6 +566,7 @@ func (node *Node) Accept(
 						keyString := string(key)
 						//fmt.Printf("Got length: keyLength=%d packetSize=%d segment=%d\n", length, packetSize, packetSize-(5+length))
 						segment := buffer[5+length : packetSize]
+						fmt.Printf("Response at key=%s %d: %s=\n", keyString, index, string(segment))
 						segmentMap[index].Store(keyString, segment)
 						count := 0
 						for i := uint32(1); i < node.Total; i++ {
