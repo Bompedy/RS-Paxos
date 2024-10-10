@@ -270,6 +270,12 @@ func (node *Node) Accept(
 	etcdWrite func(key []byte, value []byte),
 	etcdRead func(key []byte) []byte,
 ) error {
+	var segmentMap = make([]sync.Map, node.Total)
+	var reconstructed = sync.Map{}
+	for i := uint32(0); i < node.Total; i++ {
+		segmentMap[i] = sync.Map{}
+	}
+
 	for {
 		// loop here cause port might be stuck open
 		listener, err := net.Listen("tcp", fmt.Sprintf("%s:2000", address))
@@ -279,11 +285,6 @@ func (node *Node) Accept(
 
 		commitChannel := make(chan uint32, 4096)
 		readChannel := make(chan ReadResult, 4096)
-		var segmentMap = make([]sync.Map, node.Total)
-		var reconstructed = sync.Map{}
-		for i := uint32(0); i < node.Total; i++ {
-			segmentMap[i] = sync.Map{}
-		}
 
 		go func() {
 			for next := range commitChannel {
