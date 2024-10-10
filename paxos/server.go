@@ -549,9 +549,10 @@ func (node *Node) Accept(
 							copy(buf[9:], key)
 							copy(buf[9+len(key):], segment)
 							fmt.Printf("Writing key=%s %d: %s=\n", keyString, node.Index, string(segment))
-							node.Clients[node.Leader].mutex.Lock()
-							err := node.Clients[node.Leader].Write(buf)
-							node.Clients[node.Leader].mutex.Unlock()
+							client := node.Clients[node.Leader]
+							client.mutex.Lock()
+							err := client.Write(buf)
+							client.mutex.Unlock()
 							if err != nil {
 								panic("ERROR SENDING SEGMENT BACK TO LEADER")
 							}
