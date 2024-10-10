@@ -415,7 +415,7 @@ func (node *Node) Accept(
 						node.RequestIds.Store(proposal.Slot, entry.requestId)
 						node.Entries.Store(proposal.Slot, entry)
 						//fmt.Printf("Storing at key=%s %d: %s=\n", string(entry.key), node.Index, string(entry.value))
-						node.Keys.Store(string(entry.key), len(entry.value))
+						node.Keys.Store(string(entry.key), uint32(len(entry.value)))
 
 						value, exists := node.LogWaiter.LoadAndDelete(proposal.Slot)
 						if exists {
@@ -766,7 +766,7 @@ func (node *Node) Write(
 		requestId: requestId,
 		Type:      WriteType,
 	}
-	node.Keys.Store(string(key), len(value))
+	node.Keys.Store(string(key), uint32(len(value)))
 	node.Entries.Store(appliedIndex, entry)
 	channel := make(chan struct{})
 	node.WriteRequestWaiter.Store(requestId, channel)
