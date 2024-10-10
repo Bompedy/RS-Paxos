@@ -408,6 +408,7 @@ func (node *Node) Accept(
 						}
 						node.RequestIds.Store(proposal.Slot, entry.requestId)
 						node.Entries.Store(proposal.Slot, entry)
+						fmt.Printf("Storing: %d\n", len(entry.value))
 						node.Keys.Store(string(entry.key), entry.value)
 
 						value, exists := node.LogWaiter.LoadAndDelete(proposal.Slot)
@@ -528,8 +529,6 @@ func (node *Node) Accept(
 							readChannel <- ReadResult{requestId: requestId, value: value}
 						}
 					} else if op == OpSegment {
-						fmt.Println("Got op segment")
-						keyCount := uint32(0)
 						node.Keys.Range(func(keyValue, value interface{}) bool {
 							keyString := keyValue.(string)
 							key := []byte(keyString)
@@ -542,14 +541,13 @@ func (node *Node) Accept(
 							binary.LittleEndian.PutUint32(buf[5:], uint32(len(key)))
 							copy(buf[9:], key)
 							copy(buf[9+len(key):], segment)
+							fmt.Printf("Writing: %d\n", len(segment))
 							err := node.Clients[node.Leader].Write(buf)
 							if err != nil {
 								panic("ERROR SENDING SEGMENT BACK TO LEADER")
 							}
-							keyCount++
 							return true
 						})
-						atomic.StoreUint32(&KeyCount, keyCount)
 					} else if op == OpSegmentResponse {
 						fmt.Println("Got op segment response")
 						length := binary.LittleEndian.Uint32(buffer[1:5])
@@ -618,6 +616,12 @@ func (node *Node) Accept(
 						}
 						fmt.Println("Received fail slot")
 						if atomic.AddUint32(&FailSlotAcks, 1) == (node.Total - 1) {
+							keyCount := uint32(0)
+							node.Keys.Range(func(keyValue, value interface{}) bool {
+								keyCount++
+								return true
+							})
+							atomic.StoreUint32(&KeyCount, keyCount)
 							buf := make([]byte, 9)
 							binary.LittleEndian.PutUint32(buf[:4], 5)
 							buf[4] = OpSegment
@@ -804,6 +808,7 @@ func (node *Node) Write(
 
 		node.Broadcast(func(i uint32, client Client) {
 			go func(client Client) {
+				fmt.Printf("Writing: %d\n", len(segments[client.index]))
 				node.WriteProposePacket(client, ProposePacket{
 					Key:       key,
 					Value:     segments[client.index],
