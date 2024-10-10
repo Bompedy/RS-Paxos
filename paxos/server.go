@@ -336,7 +336,10 @@ func (node *Node) Accept(
 						buf := make([]byte, 5)
 						binary.LittleEndian.PutUint32(buf[:4], 1)
 						buf[4] = OpReceivedFailSlot
-						err := node.Clients[node.Leader].Write(buf)
+						client := node.Clients[node.Leader]
+						client.mutex.Lock()
+						err := client.Write(buf)
+						client.mutex.Unlock()
 						if err != nil {
 							panic("shouldnt error on write")
 						}
