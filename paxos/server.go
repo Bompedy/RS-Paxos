@@ -566,7 +566,8 @@ func (node *Node) Accept(
 								count++
 							}
 						}
-						if count < node.Segments {
+						//a 1 2 3 4 5
+						if count != node.Segments+(node.Parity-1) {
 							testLock.Unlock()
 							continue
 						}
