@@ -599,7 +599,7 @@ func (node *Node) Accept(
 						if string(fullValue) != string(value) {
 							fmt.Printf("Full Value = %s\n", fullValue)
 							fmt.Printf("Value = %s\n", value)
-							panic("Reconstructed wrong value")
+							panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s", len(fullValue), string(fullValue), len(value), string(value)))
 						}
 						etcdWrite(key, value)
 						completed := atomic.AddUint32(&ReconstructCount, 1)
@@ -776,31 +776,31 @@ func (node *Node) Write(
 		if err != nil || !ok {
 			panic(err)
 		}
-
-		segments[0] = nil
-		segments[1] = nil
-
-		err = node.Encoder.Reconstruct(segments)
-		if err != nil {
-			panic(err)
-		}
-
-		restore := make([]byte, len(value))
-		startIndex = 0
-
-		for i := range segments[:node.Segments] {
-			endIndex := startIndex + segmentSize
-			if endIndex > len(restore) {
-				endIndex = len(restore)
-			}
-			copy(restore[startIndex:endIndex], segments[i])
-			startIndex = endIndex
-		}
-
-		if string(restore) != string(value) {
-
-			panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s", len(restore), string(restore), len(value), string(value)))
-		}
+		//
+		//segments[0] = nil
+		//segments[1] = nil
+		//
+		//err = node.Encoder.Reconstruct(segments)
+		//if err != nil {
+		//	panic(err)
+		//}
+		//
+		//restore := make([]byte, len(value))
+		//startIndex = 0
+		//
+		//for i := range segments[:node.Segments] {
+		//	endIndex := startIndex + segmentSize
+		//	if endIndex > len(restore) {
+		//		endIndex = len(restore)
+		//	}
+		//	copy(restore[startIndex:endIndex], segments[i])
+		//	startIndex = endIndex
+		//}
+		//
+		//if string(restore) != string(value) {
+		//
+		//	panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s", len(restore), string(restore), len(value), string(value)))
+		//}
 
 		node.Broadcast(func(i uint32, client Client) {
 			go func(client Client) {
