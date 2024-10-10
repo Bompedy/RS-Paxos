@@ -570,6 +570,7 @@ func (node *Node) Accept(
 						if loaded {
 							continue
 						}
+						println("Made it here")
 						segmentSize := len(segment)
 						fullValueValue, _ := node.Keys.Load(keyString)
 						fullValue := fullValueValue.([]byte)
