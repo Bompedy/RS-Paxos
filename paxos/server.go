@@ -310,7 +310,7 @@ func (node *Node) Accept(
 							} else {
 								node.LogWaiter.Store(current, make(chan struct{}))
 							}
-							fmt.Printf("we are so stuck on %d\n", current)
+							//fmt.Printf("we are so stuck on %d\n", current)
 						}
 					}
 
