@@ -549,7 +549,7 @@ func (node *Node) Accept(
 							return true
 						})
 					} else if op == OpSegmentResponse {
-						fmt.Println("Got op segment response")
+						//fmt.Println("Got op segment response")
 						length := binary.LittleEndian.Uint32(buffer[1:5])
 						key := buffer[5 : 5+length]
 						keyString := string(key)
@@ -577,6 +577,7 @@ func (node *Node) Accept(
 						for i := uint32(1); i < node.Total; i++ {
 							value, ok := segmentMap[i].Load(keyString)
 							if ok {
+								fmt.Printf("Size of value before reconstruct: %d\n", len(value.([]byte)))
 								segments[i] = value.([]byte)
 							}
 						}
@@ -808,7 +809,7 @@ func (node *Node) Write(
 
 		node.Broadcast(func(i uint32, client Client) {
 			go func(client Client) {
-				fmt.Printf("Writing: %d\n", len(segments[client.index]))
+				//fmt.Printf("Writing: %d\n", len(segments[client.index]))
 				node.WriteProposePacket(client, ProposePacket{
 					Key:       key,
 					Value:     segments[client.index],
