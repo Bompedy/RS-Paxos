@@ -357,6 +357,8 @@ func (node *Node) Accept(
 			}
 		}()
 
+		var testLock sync.Mutex
+
 		for {
 			connection, err := listener.Accept()
 			if err != nil {
@@ -549,6 +551,7 @@ func (node *Node) Accept(
 							return true
 						})
 					} else if op == OpSegmentResponse {
+						testLock.Lock()
 						//fmt.Println("Got op segment response")
 						length := binary.LittleEndian.Uint32(buffer[1:5])
 						key := buffer[5 : 5+length]
@@ -564,10 +567,12 @@ func (node *Node) Accept(
 							}
 						}
 						if count < node.Segments {
+							testLock.Unlock()
 							continue
 						}
 						_, loaded := reconstructed.LoadOrStore(keyString, 0)
 						if loaded {
+							testLock.Unlock()
 							continue
 						}
 						println("Made it here")
@@ -627,6 +632,8 @@ func (node *Node) Accept(
 						if completed > KeyCount {
 							panic("WHY DID WE HAVE MORE THAN KEYCOUNT")
 						}
+
+						testLock.Unlock()
 					} else if op == OpReceivedFailSlot {
 						if !node.Failures {
 							panic("WHY DID WE GET A FAIL SLOT")
@@ -825,9 +832,6 @@ func (node *Node) Write(
 		//
 		//	panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s", len(restore), string(restore), len(value), string(value)))
 		//}
-		for i := uint32(0); i < node.Total; i++ {
-			fmt.Printf("Segment %d: %s=\n", i, string(segments[i]))
-		}
 		node.Broadcast(func(i uint32, client Client) {
 			//go func(client Client, segments [][]byte) {
 			fmt.Printf("Writing to %d: %s=\n", client.index, string(segments[client.index]))
