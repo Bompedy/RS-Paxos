@@ -363,8 +363,6 @@ func (node *Node) Accept(
 			}
 		}()
 
-		var testLock sync.Mutex
-
 		for {
 			connection, err := listener.Accept()
 			if err != nil {
@@ -560,7 +558,6 @@ func (node *Node) Accept(
 							return true
 						})
 					} else if op == OpSegmentResponse {
-						testLock.Lock()
 						//fmt.Println("Got op segment response")
 						length := binary.LittleEndian.Uint32(buffer[1:5])
 
@@ -580,13 +577,11 @@ func (node *Node) Accept(
 							}
 						}
 						//a 1 2 3 4 5
-						if count != node.Segments+(node.Parity-1) {
-							testLock.Unlock()
+						if count < node.Segments {
 							continue
 						}
 						_, loaded := reconstructed.LoadOrStore(keyString, 0)
 						if loaded {
-							testLock.Unlock()
 							continue
 						}
 						println("Made it here")
@@ -612,12 +607,7 @@ func (node *Node) Accept(
 
 						fmt.Printf("Got total segments: %d\n", total)
 
-						newEncoder, err := reedsolomon.New(node.Segments, node.Parity)
-						if err != nil {
-							panic("PROBLEM CREATING RS ENCODER")
-						}
-
-						err = newEncoder.Reconstruct(segments)
+						err = node.Encoder.Reconstruct(segments)
 						if err != nil {
 							panic("Couldnt reconstruct")
 						}
@@ -647,8 +637,6 @@ func (node *Node) Accept(
 						if completed > KeyCount {
 							panic("WHY DID WE HAVE MORE THAN KEYCOUNT")
 						}
-
-						testLock.Unlock()
 					} else if op == OpReceivedFailSlot {
 						if !node.Failures {
 							panic("WHY DID WE GET A FAIL SLOT")
@@ -774,8 +762,6 @@ func (node *Node) ForwardWrite(
 	}
 }
 
-var writeLock sync.Mutex
-
 func (node *Node) Write(
 	key []byte,
 	value []byte,
@@ -783,7 +769,7 @@ func (node *Node) Write(
 	requestId uuid.UUID,
 ) {
 
-	writeLock.Lock()
+	//writeLock.Lock()
 	appliedIndex := atomic.AddUint32(&AppliedIndex, 1)
 
 	if node.Failures && appliedIndex > node.FailSlot && node.Index == node.Leader {
@@ -805,7 +791,7 @@ func (node *Node) Write(
 
 	if Encoding {
 		var segmentSize = int(math.Ceil(float64(len(value)) / float64(node.Segments)))
-		newEncoder, err := reedsolomon.New(node.Segments, node.Parity)
+		//newEncoder, err := reedsolomon.New(node.Segments, node.Parity)
 		var segments = reedsolomon.AllocAligned(node.Segments+node.Parity, segmentSize)
 		var startIndex = 0
 		for i := range segments[:node.Segments] {
@@ -817,12 +803,7 @@ func (node *Node) Write(
 			startIndex = endIndex
 		}
 
-		err = newEncoder.Encode(segments)
-		if err != nil {
-			panic(err)
-		}
-
-		ok, err := newEncoder.Verify(segments)
+		ok, err := node.Encoder.Verify(segments)
 		if err != nil || !ok {
 			panic(err)
 		}
@@ -852,17 +833,17 @@ func (node *Node) Write(
 		//	panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s", len(restore), string(restore), len(value), string(value)))
 		//}
 		node.Broadcast(func(i uint32, client Client) {
-			//go func(client Client, segments [][]byte) {
-			fmt.Printf("Writing to key=%s size=%d: %s=\n", string(key), client.index, string(segments[client.index]))
-			node.WriteProposePacket(client, ProposePacket{
-				Key:       key,
-				Value:     segments[client.index],
-				Slot:      appliedIndex,
-				RequestId: requestId,
-				Type:      WriteType,
-				Sender:    uint8(node.Index),
-			}, OpPropose)
-			//}(client, segments)
+			go func(client Client, segments [][]byte) {
+				//fmt.Printf("Writing to key=%s size=%d: %s=\n", string(key), client.index, string(segments[client.index]))
+				node.WriteProposePacket(client, ProposePacket{
+					Key:       key,
+					Value:     segments[client.index],
+					Slot:      appliedIndex,
+					RequestId: requestId,
+					Type:      WriteType,
+					Sender:    uint8(node.Index),
+				}, OpPropose)
+			}(client, segments)
 		})
 	} else {
 		node.Broadcast(func(i uint32, client Client) {
@@ -879,7 +860,7 @@ func (node *Node) Write(
 		})
 	}
 
-	writeLock.Unlock()
+	//writeLock.Unlock()
 
 	if wait {
 		<-channel
