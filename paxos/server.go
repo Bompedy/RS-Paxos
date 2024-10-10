@@ -414,7 +414,7 @@ func (node *Node) Accept(
 						}
 						node.RequestIds.Store(proposal.Slot, entry.requestId)
 						node.Entries.Store(proposal.Slot, entry)
-						fmt.Printf("Storing at key=%s %d: %s=\n", string(entry.key), node.Index, string(entry.value))
+						//fmt.Printf("Storing at key=%s %d: %s=\n", string(entry.key), node.Index, string(entry.value))
 						node.Keys.Store(string(entry.key), entry.value)
 
 						value, exists := node.LogWaiter.LoadAndDelete(proposal.Slot)
@@ -547,7 +547,6 @@ func (node *Node) Accept(
 							binary.LittleEndian.PutUint32(buf[5:], uint32(len(key)))
 							copy(buf[9:], key)
 							copy(buf[9+len(key):], segment)
-							fmt.Printf("Writing key=%s %d: %s=\n", keyString, node.Index, string(segment))
 							client := node.Clients[node.Leader]
 							client.mutex.Lock()
 							err := client.Write(buf)
@@ -558,16 +557,13 @@ func (node *Node) Accept(
 							return true
 						})
 					} else if op == OpSegmentResponse {
-						//fmt.Println("Got op segment response")
 						length := binary.LittleEndian.Uint32(buffer[1:5])
 
 						key := make([]byte, length)
-						//fmt.Printf("Got length: keyLength=%d packetSize=%d segment=%d\n", length, packetSize, packetSize-(5+length))
 						segment := make([]byte, packetSize-(5+length))
 						copy(key, buffer[5:5+length])
 						copy(segment, buffer[5+length:packetSize])
 						keyString := string(key)
-						fmt.Printf("Response at key=%s %d: %s=\n", keyString, index, string(segment))
 						segmentMap[index].Store(keyString, segment)
 						count := 0
 						for i := uint32(1); i < node.Total; i++ {
@@ -584,28 +580,20 @@ func (node *Node) Accept(
 						if loaded {
 							continue
 						}
-						println("Made it here")
 						segmentSize := len(segment)
 						fullValueValue, _ := node.Keys.Load(keyString)
 						fullValue := fullValueValue.([]byte)
 						fullSize := len(fullValue)
 						segments := make([][]byte, node.Segments+node.Parity)
-						segments[0] = nil
 						total := 0
 						for i := uint32(1); i < node.Total; i++ {
 							value, ok := segmentMap[i].Load(keyString)
 							if ok {
-								fmt.Printf("Pulling out response=%s %d: %s=\n", keyString, i, string(value.([]byte)))
 								total += 1
-								//fmt.Printf("Size of value before reconstruct: %d\n", len(value.([]byte)))
 								segments[i] = value.([]byte)
 
-							} else {
-								segments[i] = nil
 							}
 						}
-
-						fmt.Printf("Got total segments: %d\n", total)
 
 						err = node.Encoder.Reconstruct(segments)
 						if err != nil {
@@ -622,11 +610,7 @@ func (node *Node) Accept(
 							startIndex = endIndex
 						}
 						if string(fullValue) != string(value) {
-							//fmt.Printf("Full Value = %s\n", fullValue)
-							//fmt.Printf("Value = %s\n", value)
 							panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s\n%d=%s", len(keyString), keyString, len(fullValue), string(fullValue), len(value), string(value)))
-						} else {
-							fmt.Printf("We got some that were correct?\n")
 						}
 						//etcdWrite(key, value)
 						completed := atomic.AddUint32(&ReconstructCount, 1)
@@ -644,7 +628,6 @@ func (node *Node) Accept(
 						if !Encoding {
 							panic("WE ONLY SUPPORT FAILURES WITH ENCODING")
 						}
-						fmt.Println("Received fail slot")
 						if atomic.AddUint32(&FailSlotAcks, 1) == (node.Total - 1) {
 							keyCount := uint32(0)
 							node.Keys.Range(func(keyValue, value interface{}) bool {
