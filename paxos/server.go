@@ -415,7 +415,7 @@ func (node *Node) Accept(
 						node.RequestIds.Store(proposal.Slot, entry.requestId)
 						node.Entries.Store(proposal.Slot, entry)
 						//fmt.Printf("Storing at key=%s %d: %s=\n", string(entry.key), node.Index, string(entry.value))
-						node.Keys.Store(string(entry.key), entry.value)
+						node.Keys.Store(string(entry.key), len(entry.value))
 
 						value, exists := node.LogWaiter.LoadAndDelete(proposal.Slot)
 						if exists {
@@ -581,9 +581,8 @@ func (node *Node) Accept(
 							continue
 						}
 						segmentSize := len(segment)
-						fullValueValue, _ := node.Keys.Load(keyString)
-						fullValue := fullValueValue.([]byte)
-						fullSize := len(fullValue)
+						fullSizeValue, _ := node.Keys.Load(keyString)
+						fullSize := fullSizeValue.(uint32)
 						segments := make([][]byte, node.Segments+node.Parity)
 						total := 0
 						for i := uint32(1); i < node.Total; i++ {
@@ -609,9 +608,9 @@ func (node *Node) Accept(
 							copy(value[startIndex:endIndex], segments[i])
 							startIndex = endIndex
 						}
-						if string(fullValue) != string(value) {
-							panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s\n%d=%s", len(keyString), keyString, len(fullValue), string(fullValue), len(value), string(value)))
-						}
+						//if string(fullValue) != string(value) {
+						//	panic(fmt.Errorf("they were different!\n%d=%s\n%d=%s\n%d=%s", len(keyString), keyString, len(fullValue), string(fullValue), len(value), string(value)))
+						//}
 						etcdWrite(key, value)
 						completed := atomic.AddUint32(&ReconstructCount, 1)
 						if completed == KeyCount {
@@ -767,7 +766,7 @@ func (node *Node) Write(
 		requestId: requestId,
 		Type:      WriteType,
 	}
-	node.Keys.Store(string(key), value)
+	node.Keys.Store(string(key), len(value))
 	node.Entries.Store(appliedIndex, entry)
 	channel := make(chan struct{})
 	node.WriteRequestWaiter.Store(requestId, channel)
