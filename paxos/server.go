@@ -538,8 +538,8 @@ func (node *Node) Accept(
 						node.Keys.Range(func(keyValue, value interface{}) bool {
 							keyString := keyValue.(string)
 							key := []byte(keyString)
-							segment := value.([]byte)
-							//segment := etcdRead(key)
+							//segment := value.([]byte)
+							segment := etcdRead(key)
 							//4 + 1 + 4 + len(
 							buf := make([]byte, 9+len(key)+len(segment))
 							binary.LittleEndian.PutUint32(buf[:4], uint32(5+len(key)+len(segment)))
