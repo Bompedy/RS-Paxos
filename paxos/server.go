@@ -407,7 +407,7 @@ func (node *Node) Accept(
 						}
 						node.RequestIds.Store(proposal.Slot, entry.requestId)
 						node.Entries.Store(proposal.Slot, entry)
-						node.Keys.Store(string(entry.key), 0)
+						node.Keys.Store(string(entry.key), proposal.Slot)
 
 						value, exists := node.LogWaiter.LoadAndDelete(proposal.Slot)
 						if exists {
@@ -530,7 +530,8 @@ func (node *Node) Accept(
 						fmt.Println("Got op segment")
 						keyCount := uint32(0)
 						node.Keys.Range(func(keyValue, value interface{}) bool {
-							key := keyValue.([]byte)
+							keyString := keyValue.(string)
+							key := []byte(keyString)
 							segment := etcdRead(key)
 							buf := make([]byte, 13+len(segment))
 							binary.LittleEndian.PutUint32(buf[:4], uint32(9+len(segment)))
@@ -550,11 +551,12 @@ func (node *Node) Accept(
 						fmt.Println("Got op segment response")
 						length := binary.LittleEndian.Uint32(buffer[1:])
 						key := buffer[5 : 5+length]
+						keyString := string(key)
 						v := buffer[5+length:]
-						segmentMap[index].Store(key, v)
+						segmentMap[index].Store(keyString, v)
 						count := 0
 						for i := uint32(0); i < node.Total; i++ {
-							_, ok := segmentMap[i].Load(key)
+							_, ok := segmentMap[i].Load(keyString)
 							if ok {
 								count++
 							}
@@ -562,7 +564,7 @@ func (node *Node) Accept(
 						if count < node.Segments {
 							continue
 						}
-						_, loaded := reconstructed.LoadOrStore(key, 0)
+						_, loaded := reconstructed.LoadOrStore(keyString, 0)
 						if loaded {
 							continue
 						}
@@ -570,7 +572,7 @@ func (node *Node) Accept(
 						fullSize := binary.LittleEndian.Uint32(v[segmentSize-4:])
 						segments := make([][]byte, node.Segments+node.Parity)
 						for i := uint32(0); i < node.Total; i++ {
-							value, ok := segmentMap[i].Load(key)
+							value, ok := segmentMap[i].Load(keyString)
 							if ok {
 								segments[i] = value.([]byte)[:segmentSize-4]
 							}
@@ -743,7 +745,7 @@ func (node *Node) Write(
 		requestId: requestId,
 		Type:      WriteType,
 	}
-	node.Keys.Store(appliedIndex, key)
+	node.Keys.Store(string(key), appliedIndex)
 	node.Entries.Store(appliedIndex, entry)
 	channel := make(chan struct{})
 	node.WriteRequestWaiter.Store(requestId, channel)
