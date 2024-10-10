@@ -408,7 +408,7 @@ func (node *Node) Accept(
 						}
 						node.RequestIds.Store(proposal.Slot, entry.requestId)
 						node.Entries.Store(proposal.Slot, entry)
-						node.Keys.Store(string(entry.key), proposal.Slot)
+						node.Keys.Store(string(entry.key), entry.value)
 
 						value, exists := node.LogWaiter.LoadAndDelete(proposal.Slot)
 						if exists {
@@ -533,7 +533,9 @@ func (node *Node) Accept(
 						node.Keys.Range(func(keyValue, value interface{}) bool {
 							keyString := keyValue.(string)
 							key := []byte(keyString)
-							segment := etcdRead(key)
+							shard := value.([]byte)
+							//segment := etcdRead(key)
+							segment := shard
 							buf := make([]byte, 13+len(segment))
 							binary.LittleEndian.PutUint32(buf[:4], uint32(9+len(segment)))
 							buf[4] = OpSegmentResponse
