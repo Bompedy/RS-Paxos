@@ -785,7 +785,7 @@ func (node *Node) Write(
 			panic(err)
 		}
 
-		restore := make([]byte, segmentSize*(node.Segments+node.Parity))
+		restore := make([]byte, len(value))
 		startIndex = 0
 
 		for i := range segments[:node.Segments] {
