@@ -605,7 +605,7 @@ func (node *Node) Accept(
 						} else {
 							fmt.Printf("We got some that were correct?\n")
 						}
-						etcdWrite(key, value)
+						//etcdWrite(key, value)
 						completed := atomic.AddUint32(&ReconstructCount, 1)
 						if completed == KeyCount {
 							println("Did we complete?")
