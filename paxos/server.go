@@ -93,10 +93,12 @@ func (node *Node) BroadcastWrite(buffer []byte) {
 			continue
 		}
 		go func(client Client) {
+			client.mutex.Lock()
 			err := client.Write(buffer)
 			if err != nil {
 				panic("SHUTDOWN")
 			}
+			client.mutex.Unlock()
 		}(node.Clients[i])
 	}
 }
