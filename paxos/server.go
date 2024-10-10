@@ -592,7 +592,10 @@ func (node *Node) Accept(
 							copy(value[startIndex:endIndex], segments[i])
 							startIndex = endIndex
 						}
+
 						if string(previous) != string(value) {
+							fmt.Printf("Previous = %s\n", previous)
+							fmt.Printf("Value = %s\n", value)
 							panic("Reconstructed wrong value")
 						}
 						fullSizeBytes := make([]byte, 4)
