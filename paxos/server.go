@@ -607,7 +607,7 @@ func (node *Node) Accept(
 						if !Failures {
 							panic("WHY DID WE GET A FAIL SLOT")
 						}
-						if Encoding {
+						if !Encoding {
 							panic("WE ONLY SUPPORT FAILURES WITH ENCODING")
 						}
 						fmt.Println("Received fail slot")
