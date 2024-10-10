@@ -553,7 +553,7 @@ func (node *Node) Accept(
 						length := binary.LittleEndian.Uint32(buffer[1:5])
 						key := buffer[5 : 5+length]
 						keyString := string(key)
-						segment := buffer[5+length:]
+						segment := buffer[5+length : packetSize]
 						segmentMap[index].Store(keyString, segment)
 						count := 0
 						for i := uint32(1); i < node.Total; i++ {
