@@ -570,7 +570,7 @@ func (node *Node) Accept(
 							continue
 						}
 						segmentSize := len(v)
-						fullValue, _ := node.Keys.Load(key)
+						fullValue, _ := node.Keys.Load(keyString)
 						fullSize := len(fullValue.([]byte))
 						segments := make([][]byte, node.Segments+node.Parity)
 						for i := uint32(0); i < node.Total; i++ {
