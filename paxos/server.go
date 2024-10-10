@@ -760,6 +760,8 @@ func (node *Node) ForwardWrite(
 	}
 }
 
+var writeLock sync.Mutex
+
 func (node *Node) Write(
 	key []byte,
 	value []byte,
@@ -767,6 +769,7 @@ func (node *Node) Write(
 	requestId uuid.UUID,
 ) {
 
+	writeLock.Lock()
 	appliedIndex := atomic.AddUint32(&AppliedIndex, 1)
 
 	if node.Failures && appliedIndex > node.FailSlot && node.Index == node.Leader {
@@ -861,6 +864,8 @@ func (node *Node) Write(
 			}(client)
 		})
 	}
+
+	writeLock.Unlock()
 
 	if wait {
 		<-channel
