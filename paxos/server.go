@@ -576,6 +576,7 @@ func (node *Node) Accept(
 						fullValue := fullValueValue.([]byte)
 						fullSize := len(fullValue)
 						segments := make([][]byte, node.Segments+node.Parity)
+						segments[0] = nil
 
 						for i := uint32(1); i < node.Total; i++ {
 							value, ok := segmentMap[i].Load(keyString)
@@ -583,6 +584,8 @@ func (node *Node) Accept(
 								//fmt.Printf("Size of value before reconstruct: %d\n", len(value.([]byte)))
 								segments[i] = value.([]byte)
 
+							} else {
+								segments[i] = nil
 							}
 						}
 
