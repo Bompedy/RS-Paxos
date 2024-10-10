@@ -39,15 +39,14 @@ var ReconstructCount uint32
 //
 //var Encoder reedsolomon.Encoder
 
-var Failures = false
+var Failures = true
 var Encoding = true
-var FailSlot = uint32(100)
+var FailSlot = uint32(7000)
 var FailSlotAcks = uint32(0)
 
 type Node struct {
 	Clients            []Client
 	Failed             []bool
-	Reconstructor      sync.Map
 	Keys               sync.Map
 	ReadRequestWaiter  sync.Map
 	ReadSenders        sync.Map
@@ -332,6 +331,7 @@ func (node *Node) Accept(
 					}
 
 					if Failures && CommitIndex == FailSlot {
+						fmt.Println("Reached fail slot")
 						buf := make([]byte, 5)
 						binary.LittleEndian.PutUint32(buf[:4], 1)
 						buf[4] = OpReceivedFailSlot
@@ -527,6 +527,7 @@ func (node *Node) Accept(
 							readChannel <- ReadResult{requestId: requestId, value: value}
 						}
 					} else if op == OpSegment {
+						fmt.Println("Got op segment")
 						keyCount := uint32(0)
 						node.Keys.Range(func(keyValue, value interface{}) bool {
 							key := keyValue.([]byte)
@@ -546,6 +547,7 @@ func (node *Node) Accept(
 						})
 						atomic.StoreUint32(&KeyCount, keyCount)
 					} else if op == OpSegmentResponse {
+						fmt.Println("Got op segment response")
 						length := binary.LittleEndian.Uint32(buffer[1:])
 						key := buffer[5 : 5+length]
 						v := buffer[5+length:]
@@ -605,11 +607,10 @@ func (node *Node) Accept(
 						if !Failures {
 							panic("WHY DID WE GET A FAIL SLOT")
 						}
-
 						if Encoding {
 							panic("WE ONLY SUPPORT FAILURES WITH ENCODING")
 						}
-
+						fmt.Println("Received fail slot")
 						if atomic.AddUint32(&FailSlotAcks, 1) == (node.Total - 1) {
 							buf := make([]byte, 9)
 							binary.LittleEndian.PutUint32(buf[:4], 5)
@@ -654,11 +655,15 @@ func (node *Node) Read(
 	sender uint8,
 ) []byte {
 
+	appliedIndex := atomic.AddUint32(&AppliedIndex, 1)
+	if Failures && appliedIndex > FailSlot && node.Index == node.Leader {
+		<-ReconstructionWaiter
+	}
+
 	channel := make(chan []byte)
 	node.ReadRequestWaiter.Store(requestId, channel)
 	node.ReadSenders.Store(requestId, sender)
 
-	appliedIndex := atomic.AddUint32(&AppliedIndex, 1)
 	entry := &Entry{
 		key:       key,
 		value:     make([]byte, 0),
@@ -726,7 +731,7 @@ func (node *Node) Write(
 
 	appliedIndex := atomic.AddUint32(&AppliedIndex, 1)
 
-	if Failures && appliedIndex > FailSlot && node.Index == 0 {
+	if Failures && appliedIndex > FailSlot && node.Index == node.Leader {
 		<-ReconstructionWaiter
 	}
 
