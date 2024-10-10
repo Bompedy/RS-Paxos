@@ -817,7 +817,7 @@ func (node *Node) Write(
 					Type:      WriteType,
 					Sender:    uint8(node.Index),
 				}, OpPropose)
-			}(node.Clients[i])
+			}(client)
 		})
 	} else {
 		node.Broadcast(func(i uint32, client Client) {
@@ -830,7 +830,7 @@ func (node *Node) Write(
 					Type:      WriteType,
 					Sender:    uint8(node.Index),
 				}, OpPropose)
-			}(node.Clients[i])
+			}(client)
 		})
 	}
 
