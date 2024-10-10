@@ -584,7 +584,13 @@ func (node *Node) Accept(
 
 							}
 						}
-						err := node.Encoder.Reconstruct(segments)
+
+						newEncoder, err := reedsolomon.New(node.Segments, node.Parity)
+						if err != nil {
+							panic("PROBLEM CREATING RS ENCODER")
+						}
+
+						err = newEncoder.Reconstruct(segments)
 						if err != nil {
 							panic("Couldnt reconstruct")
 						}
