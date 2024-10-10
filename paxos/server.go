@@ -550,11 +550,11 @@ func (node *Node) Accept(
 						atomic.StoreUint32(&KeyCount, keyCount)
 					} else if op == OpSegmentResponse {
 						fmt.Println("Got op segment response")
-						length := binary.LittleEndian.Uint32(buffer[1:])
+						length := binary.LittleEndian.Uint32(buffer[1:5])
 						key := buffer[5 : 5+length]
 						keyString := string(key)
-						v := buffer[5+length:]
-						segmentMap[index].Store(keyString, v)
+						segment := buffer[5+length:]
+						segmentMap[index].Store(keyString, segment)
 						count := 0
 						for i := uint32(0); i < node.Total; i++ {
 							_, ok := segmentMap[i].Load(keyString)
@@ -569,9 +569,10 @@ func (node *Node) Accept(
 						if loaded {
 							continue
 						}
-						segmentSize := len(v)
-						fullValue, _ := node.Keys.Load(keyString)
-						fullSize := len(fullValue.([]byte))
+						segmentSize := len(segment)
+						fullValueValue, _ := node.Keys.Load(keyString)
+						fullValue := fullValueValue.([]byte)
+						fullSize := len(fullValue)
 						segments := make([][]byte, node.Segments+node.Parity)
 						for i := uint32(0); i < node.Total; i++ {
 							value, ok := segmentMap[i].Load(keyString)
@@ -583,7 +584,6 @@ func (node *Node) Accept(
 						if err != nil {
 							panic("Couldnt reconstruct")
 						}
-						previous := v
 						value := make([]byte, fullSize)
 						startIndex := 0
 						for i := range segments[:node.Segments] {
@@ -594,9 +594,8 @@ func (node *Node) Accept(
 							copy(value[startIndex:endIndex], segments[i])
 							startIndex = endIndex
 						}
-
-						if string(previous) != string(value) {
-							fmt.Printf("Previous = %s\n", previous)
+						if string(fullValue) != string(value) {
+							fmt.Printf("Full Value = %s\n", fullValue)
 							fmt.Printf("Value = %s\n", value)
 							panic("Reconstructed wrong value")
 						}
