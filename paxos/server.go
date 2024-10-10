@@ -802,6 +802,11 @@ func (node *Node) Write(
 			startIndex = endIndex
 		}
 
+		err := node.Encoder.Encode(segments)
+		if err != nil {
+			panic(err)
+		}
+
 		ok, err := node.Encoder.Verify(segments)
 		if err != nil || !ok {
 			panic(err)
