@@ -444,7 +444,7 @@ func (node *Node) Accept(
 							if forward.Type == ReadType {
 								node.Read(forward.Key, false, forward.RequestId, forward.Sender)
 							} else {
-								node.Write(forward.Key, forward.Value, false, forward.RequestId, etcdWrite)
+								node.Write(forward.Key, forward.Value, false, forward.RequestId)
 							}
 						}()
 					} else if op == OpAck {
@@ -725,7 +725,6 @@ func (node *Node) Read(
 func (node *Node) ForwardWrite(
 	key []byte,
 	value []byte,
-	etcdWrite func(key []byte, value []byte),
 ) {
 	requestId := uuid.New()
 	leader := atomic.LoadUint32(&node.Leader)
@@ -745,7 +744,7 @@ func (node *Node) ForwardWrite(
 		node.WriteProposePacket(node.Clients[leader], packet, OpForward)
 		<-channel
 	} else {
-		node.Write(key, value, true, requestId, etcdWrite)
+		node.Write(key, value, true, requestId)
 	}
 }
 
@@ -754,7 +753,6 @@ func (node *Node) Write(
 	value []byte,
 	wait bool,
 	requestId uuid.UUID,
-	etcdWrite func(key []byte, value []byte),
 ) {
 
 	//writeLock.Lock()
@@ -812,22 +810,21 @@ func (node *Node) Write(
 			}(client, segments)
 		})
 	} else {
-		//etcdWrite(key, value)
-		//node.Broadcast(func(i uint32, client Client) {
-		//	go func(client Client) {
-		//		node.WriteProposePacket(client, ProposePacket{
-		//			Key:       key,
-		//			Value:     value,
-		//			Slot:      appliedIndex,
-		//			RequestId: requestId,
-		//			Type:      WriteType,
-		//			Sender:    uint8(node.Index),
-		//		}, OpPropose)
-		//	}(client)
-		//})
+		node.Broadcast(func(i uint32, client Client) {
+			go func(client Client) {
+				node.WriteProposePacket(client, ProposePacket{
+					Key:       key,
+					Value:     value,
+					Slot:      appliedIndex,
+					RequestId: requestId,
+					Type:      WriteType,
+					Sender:    uint8(node.Index),
+				}, OpPropose)
+			}(client)
+		})
 	}
 
-	//if wait {
-	//	<-channel
-	//}
+	if wait {
+		<-channel
+	}
 }
