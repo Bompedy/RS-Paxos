@@ -40,7 +40,7 @@ var ReconstructCount uint32
 //var Encoder reedsolomon.Encoder
 
 // var Failures = true
-var Encoding = true
+var Encoding = false
 var FailSlotAcks = uint32(0)
 
 type Node struct {
